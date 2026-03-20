@@ -11,6 +11,8 @@ It wraps the following LuCI RPC libraries:
 
 The upstream JSON‑RPC behaviour is documented in `JsonRpcHowTo.md` of the [LuCI Wiki](https://github.com/openwrt/luci/wiki).
 
+> **WARNING: All features are highly experimental!** Full testing has not been done yet. Use in production at your own risk.
+
 ## Requirements
 
 On the router:
