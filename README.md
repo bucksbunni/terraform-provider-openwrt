@@ -11,6 +11,8 @@ It wraps the following LuCI RPC libraries:
 
 The upstream JSON‑RPC behaviour is documented in `JsonRpcHowTo.md` of the [LuCI Wiki](https://github.com/openwrt/luci/wiki).
 
+> **WARNING: All features are highly experimental!** Full testing has not been done yet. Use in production at your own risk.
+
 ## Requirements
 
 On the router:
@@ -628,6 +630,20 @@ output "signal_strength" {
   value = data.openwrt_sys_wireless.wlan0.signal
 }
 ```
+
+## Examples
+
+Example Terraform configurations are available in the [`examples/`](./examples/) directory:
+
+- [`basic`](./examples/basic/) - Data source usage (hostname, uptime, network devices)
+- [`network-interfaces`](./examples/network-interfaces/) - Network bridges, interfaces, and VLANs
+- [`firewall-setup`](./examples/firewall-setup/) - Multi-zone firewall with rules and forwarding
+- [`dhcp-dns`](./examples/dhcp-dns/) - DHCP pools, dnsmasq, and static reservations
+- [`wireless`](./examples/wireless/) - Dual-band WiFi with multiple SSIDs
+- [`system`](./examples/system/) - System settings, NTP, LEDs, and SSH
+- [`complete-router`](./examples/complete-router/) - Full router configuration
+
+See [`examples/README.md`](./examples/README.md) for usage instructions.
 
 ## Limitations and TODOs
 
