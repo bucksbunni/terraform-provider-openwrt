@@ -148,6 +148,35 @@ resource "openwrt_network_device" "bond0" {
 }
 ```
 
+#### openwrt_network_bridge_vlan
+
+Manages bridge VLAN assignments:
+
+```hcl
+resource "openwrt_network_bridge_vlan" "vlan1" {
+  device = "br-lan"
+  vlan   = 1
+  ports  = "eth0:u* eth1:u*"
+}
+
+resource "openwrt_network_bridge_vlan" "vlan10" {
+  device = "br-lan"
+  vlan   = 10
+  ports  = "eth2:t eth3:t"
+}
+```
+
+#### openwrt_network_globals
+
+Manages network global settings:
+
+```hcl
+resource "openwrt_network_globals" "main" {
+  ula_prefix     = "fda1:b7f5:46f7::/48"
+  packet_steering = true
+}
+```
+
 #### openwrt_network_wireguard
 
 Manages WireGuard VPN peers:
@@ -221,6 +250,22 @@ resource "openwrt_firewall_forwarding" "guest_to_wan" {
 }
 ```
 
+#### openwrt_firewall_defaults
+
+Manages firewall default policies:
+
+```hcl
+resource "openwrt_firewall_defaults" "main" {
+  input             = "REJECT"
+  output            = "ACCEPT"
+  forward           = "REJECT"
+  synflood_protect  = true
+  synflood_rate     = "25/s"
+  drop_invalid     = true
+  auto_helper      = true
+}
+```
+
 ### DHCP Resources
 
 #### openwrt_dhcp_pool
@@ -273,6 +318,19 @@ resource "openwrt_dhcp_host" "server" {
   ip        = "192.168.1.100"
   mac       = "00:11:22:33:44:55"
   leasetime = "infinite"
+}
+```
+
+#### openwrt_dhcp_odhcpd
+
+Manages DHCPv6 (odhcpd) settings:
+
+```hcl
+resource "openwrt_dhcp_odhcpd" "main" {
+  maindhcp     = false
+  leasefile   = "/tmp/hosts/odhcpd"
+  leasetrigger = "/usr/sbin/odhcpd-update"
+  loglevel    = 4
 }
 ```
 
@@ -332,6 +390,39 @@ resource "openwrt_system" "main" {
 }
 ```
 
+#### openwrt_system_ntp
+
+Manages NTP (timeserver) configuration:
+
+```hcl
+resource "openwrt_system_ntp" "main" {
+  name    = "ntp"
+  enabled = true
+  server  = "0.openwrt.pool.ntp.org 1.openwrt.pool.ntp.org"
+}
+```
+
+#### openwrt_system_led
+
+Manages system LED configuration:
+
+```hcl
+resource "openwrt_system_led" "wan_led" {
+  name     = "WAN LED"
+  sysfs   = "apu:green:3"
+  trigger = "netdev"
+  mode    = "link tx rx"
+  dev     = "eth0"
+}
+
+resource "openwrt_system_led" "diag_led" {
+  name     = "DIAG"
+  sysfs   = "apu:green:1"
+  trigger = "none"
+  default = true
+}
+```
+
 ### SSH Resources
 
 #### openwrt_dropbear
@@ -345,6 +436,57 @@ resource "openwrt_dropbear" "main" {
   port             = 22
   root_password_auth = true
   root_login       = true
+}
+```
+
+### Web Server Resources
+
+#### openwrt_uhttpd
+
+Manages uHTTPd web server settings:
+
+```hcl
+resource "openwrt_uhttpd" "main" {
+  name              = "main"
+  listen_http       = "0.0.0.0:80 [::]:80"
+  listen_https     = "0.0.0.0:443 [::]:443"
+  redirect_https    = true
+  home              = "/www"
+  rfc1918_filter   = true
+  max_requests     = 3
+  max_connections  = 100
+  cert             = "/etc/uhttpd.crt"
+  key              = "/etc/uhttpd.key"
+}
+```
+
+#### openwrt_uhttpd_cert
+
+Manages uHTTPd certificate generation settings:
+
+```hcl
+resource "openwrt_uhttpd_cert" "defaults" {
+  name       = "defaults"
+  days       = 397
+  key_type   = "ec"
+  ec_curve   = "P-256"
+  country    = "US"
+  state      = "California"
+  location   = "San Francisco"
+  commonname = "router.local"
+}
+```
+
+### RPC Daemon Resources
+
+#### openwrt_rpcd
+
+Manages RPC daemon (ubus) settings:
+
+```hcl
+resource "openwrt_rpcd" "main" {
+  socket  = "/var/run/ubus/ubus.sock"
+  timeout = 30
 }
 ```
 
