@@ -154,7 +154,26 @@ func (p *openwrtProvider) Resources(_ context.Context) []func() resource.Resourc
 
 func (p *openwrtProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
+		// Generic
 		NewSysRPCDataSource,
+
+		// System
+		NewSysHostnameDataSource,
+		NewSysUptimeDataSource,
+		NewSysInitDataSource,
+
+		// Network
+		NewSysNetDevicesDataSource,
+		NewSysNetRoutesDataSource,
+		NewSysNetRoutes6DataSource,
+		NewSysNetArpTableDataSource,
+		NewSysNetConntrackDataSource,
+
+		// Process
+		NewSysProcessListDataSource,
+
+		// Wireless
+		NewSysWirelessDataSource,
 	}
 }
 
