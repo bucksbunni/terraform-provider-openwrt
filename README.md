@@ -494,32 +494,138 @@ resource "openwrt_rpcd" "main" {
 
 #### openwrt_sys_rpc
 
-Low‑level `/rpc/sys` access:
+Low‑level `/rpc/sys` access for any sys API method:
 
 ```hcl
-data "openwrt_sys_rpc" "hostname" {
-  method = "hostname"
-}
-
-output "hostname" {
-  value = jsondecode(data.openwrt_sys_rpc.hostname.result_json)
-}
-```
-
-Example: IPv4 routes:
-
-```hcl
-data "openwrt_sys_rpc" "routes" {
+data "openwrt_sys_rpc" "example" {
   method      = "net.routes"
   params_json = "[]"
 }
 
-locals {
-  routes = jsondecode(data.openwrt_sys_rpc.routes.result_json)
+output "result" {
+  value = jsondecode(data.openwrt_sys_rpc.example.result_json)
 }
+```
+
+#### openwrt_sys_hostname
+
+Retrieves the system hostname:
+
+```hcl
+data "openwrt_sys_hostname" "main" {}
+
+output "hostname" {
+  value = data.openwrt_sys_hostname.main.hostname
+}
+```
+
+#### openwrt_sys_uptime
+
+Retrieves the system uptime:
+
+```hcl
+data "openwrt_sys_uptime" "main" {}
+
+output "uptime_seconds" {
+  value = data.openwrt_sys_uptime.main.uptime
+}
+```
+
+#### openwrt_sys_init
+
+Retrieves the list of init scripts and their status:
+
+```hcl
+data "openwrt_sys_init" "main" {}
+
+output "enabled_services" {
+  value = [for s in data.openwrt_sys_init.main.scripts : s.name if s.enabled]
+}
+```
+
+#### openwrt_sys_net_devices
+
+Retrieves network device information:
+
+```hcl
+data "openwrt_sys_net_devices" "main" {}
+
+output "interfaces" {
+  value = data.openwrt_sys_net_devices.main.devices
+}
+```
+
+#### openwrt_sys_net_routes
+
+Retrieves the IPv4 routing table:
+
+```hcl
+data "openwrt_sys_net_routes" "main" {}
 
 output "routes" {
-  value = local.routes
+  value = data.openwrt_sys_net_routes.main.routes
+}
+```
+
+#### openwrt_sys_net_routes6
+
+Retrieves the IPv6 routing table:
+
+```hcl
+data "openwrt_sys_net_routes6" "main" {}
+
+output "ipv6_routes" {
+  value = data.openwrt_sys_net_routes6.main.routes
+}
+```
+
+#### openwrt_sys_net_arptable
+
+Retrieves the ARP table:
+
+```hcl
+data "openwrt_sys_net_arptable" "main" {}
+
+output "arp_entries" {
+  value = data.openwrt_sys_net_arptable.main.entries
+}
+```
+
+#### openwrt_sys_net_conntrack
+
+Retrieves the connection tracking table:
+
+```hcl
+data "openwrt_sys_net_conntrack" "main" {}
+
+output "connections" {
+  value = data.openwrt_sys_net_conntrack.main.entries
+}
+```
+
+#### openwrt_sys_process_list
+
+Retrieves the list of running processes:
+
+```hcl
+data "openwrt_sys_process_list" "main" {}
+
+output "processes" {
+  value = data.openwrt_sys_process_list.main.processes
+}
+```
+
+#### openwrt_sys_wireless
+
+Retrieves wireless interface information:
+
+```hcl
+data "openwrt_sys_wireless" "wlan0" {
+  ifname = "wlan0"
+}
+
+output "signal_strength" {
+  value = data.openwrt_sys_wireless.wlan0.signal
 }
 ```
 
