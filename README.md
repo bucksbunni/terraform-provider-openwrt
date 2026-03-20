@@ -9,7 +9,7 @@ It wraps the following LuCI RPC libraries:
 - `/cgi-bin/luci/rpc/sys` – system info and utilities
 - `/cgi-bin/luci/rpc/ipkg` – package manager (opkg)
 
-The upstream JSON‑RPC behaviour is documented in `JsonRpcHowTo.md` (included in this repository) and the LuCI LuaDocs under `docs/`.
+The upstream JSON‑RPC behaviour is documented in `JsonRpcHowTo.md` of the [LuCI Wiki](https://github.com/openwrt/luci/wiki).
 
 ## Requirements
 
