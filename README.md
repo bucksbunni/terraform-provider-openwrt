@@ -36,7 +36,7 @@ Build the provider binary:
 go build ./...
 ```
 
-Place `terraform-provider-openwrt` in your Terraform plugin directory or use terraform init with `source = "bucksbunni/openwrt"` once you publish the provider.
+Place `terraform-provider-openwrt` in your Terraform plugin directory or use terraform init with `source = "bucksbunni/openwrt"` once this provider becomes available.
 
 ## Provider configuration
 
