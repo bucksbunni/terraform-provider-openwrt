@@ -635,13 +635,13 @@ output "signal_strength" {
 
 Example Terraform configurations are available in the [`examples/`](./examples/) directory:
 
-- [`examples/basic/`](./examples/basic/) - Data source usage (hostname, uptime, network devices)
-- [`examples/network-interfaces/`](./examples/network-interfaces/) - Network bridges, interfaces, and VLANs
-- [`examples/firewall-setup/`](./examples/firewall-setup/) - Multi-zone firewall with rules and forwarding
-- [`examples/dhcp-dns/`](./examples/dhcp-dns/) - DHCP pools, dnsmasq, and static reservations
-- [`examples/wireless/`](./examples/wireless/) - Dual-band WiFi with multiple SSIDs
-- [`examples/system/`](./examples/system/) - System settings, NTP, LEDs, and SSH
-- [`examples/complete-router/`](./examples/complete-router/) - Full router configuration
+- [`basic`](./examples/basic/) - Data source usage (hostname, uptime, network devices)
+- [`network-interfaces`](./examples/network-interfaces/) - Network bridges, interfaces, and VLANs
+- [`firewall-setup`](./examples/firewall-setup/) - Multi-zone firewall with rules and forwarding
+- [`dhcp-dns`](./examples/dhcp-dns/) - DHCP pools, dnsmasq, and static reservations
+- [`wireless`](./examples/wireless/) - Dual-band WiFi with multiple SSIDs
+- [`system`](./examples/system/) - System settings, NTP, LEDs, and SSH
+- [`complete-router`](./examples/complete-router/) - Full router configuration
 
 See [`examples/README.md`](./examples/README.md) for usage instructions.
 
