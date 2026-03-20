@@ -107,9 +107,35 @@ func (p *openwrtProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 func (p *openwrtProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		// Generic
 		NewUCISectionResource,
 		NewFSFileResource,
 		NewIPKGPackageResource,
+
+		// Firewall
+		NewFirewallRuleResource,
+		NewFirewallZoneResource,
+		NewFirewallForwardingResource,
+
+		// Network
+		NewNetworkInterfaceResource,
+		NewNetworkDeviceResource,
+		NewNetworkWireguardResource,
+
+		// DHCP
+		NewDHCPPoolResource,
+		NewDHCPDNSMasqResource,
+		NewDHCPHostResource,
+
+		// System
+		NewSystemResource,
+
+		// Dropbear (SSH)
+		NewDropbearResource,
+
+		// Wireless
+		NewWirelessDeviceResource,
+		NewWirelessInterfaceResource,
 	}
 }
 
