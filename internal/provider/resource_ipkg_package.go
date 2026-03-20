@@ -1,10 +1,9 @@
-package resource
+package provider
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/bucksbunni/terraform-provider-openwrt/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -19,7 +18,7 @@ func NewIPKGPackageResource() resource.Resource {
 }
 
 type ipkgPackageResource struct {
-	client *client.JsonRpcClient
+	client *JsonRpcClient
 }
 
 type ipkgPackageModel struct {
@@ -52,11 +51,11 @@ func (r *ipkgPackageResource) Configure(_ context.Context, req resource.Configur
 		return
 	}
 
-	client, ok := req.ProviderData.(*client.JsonRpcClient)
+	client, ok := req.ProviderData.(*JsonRpcClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected provider data type",
-			fmt.Sprintf("Expected *client.JsonRpcClient, got %T", req.ProviderData),
+			fmt.Sprintf("Expected *JsonRpcClient, got %T", req.ProviderData),
 		)
 		return
 	}

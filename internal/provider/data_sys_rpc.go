@@ -1,11 +1,10 @@
-package datasource
+package provider
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/bucksbunni/terraform-provider-openwrt/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	dsschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -18,7 +17,7 @@ func NewSysRPCDataSource() datasource.DataSource {
 }
 
 type sysRPCDataSource struct {
-	client *client.JsonRpcClient
+	client *JsonRpcClient
 }
 
 type sysRPCModel struct {
@@ -66,11 +65,11 @@ func (d *sysRPCDataSource) Configure(_ context.Context, req datasource.Configure
 		return
 	}
 
-	client, ok := req.ProviderData.(*client.JsonRpcClient)
+	client, ok := req.ProviderData.(*JsonRpcClient)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected provider data type",
-			fmt.Sprintf("Expected *client.JsonRpcClient, got %T", req.ProviderData),
+			fmt.Sprintf("Expected *JsonRpcClient, got %T", req.ProviderData),
 		)
 		return
 	}

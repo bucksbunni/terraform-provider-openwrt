@@ -9,10 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-
-	"github.com/bucksbunni/terraform-provider-openwrt/internal/client"
-	dt "github.com/bucksbunni/terraform-provider-openwrt/internal/datasource"
-	rs "github.com/bucksbunni/terraform-provider-openwrt/internal/resource"
 )
 
 var _ provider.Provider = &openwrtProvider{}
@@ -87,7 +83,7 @@ func (p *openwrtProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	client, err := client.NewJsonRpcClient(ctx, client.JsonRpcConfig{
+	client, err := NewJsonRpcClient(ctx, JsonRpcConfig{
 		BaseURL:  host,
 		Username: user,
 		Password: pass,
@@ -111,15 +107,15 @@ func (p *openwrtProvider) Configure(ctx context.Context, req provider.ConfigureR
 
 func (p *openwrtProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		rs.NewUCISectionResource,
-		rs.NewFSFileResource,
-		rs.NewIPKGPackageResource,
+		NewUCISectionResource,
+		NewFSFileResource,
+		NewIPKGPackageResource,
 	}
 }
 
 func (p *openwrtProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		dt.NewSysRPCDataSource,
+		NewSysRPCDataSource,
 	}
 }
 
