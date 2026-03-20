@@ -60,7 +60,9 @@ provider "openwrt" {
 
 ## Resources
 
-### openwrt_uci_section
+### Generic Resources
+
+#### openwrt_uci_section
 
 Manage a UCI section and its options:
 
@@ -84,7 +86,7 @@ This uses `/rpc/uci`:
 - `tset` to update
 - `commit` and `apply` to persist & apply changes
 
-### openwrt_fs_file
+#### openwrt_fs_file
 
 Manage a file via `/rpc/fs`:
 
@@ -97,7 +99,7 @@ resource "openwrt_fs_file" "motd" {
 
 Content is base64‑encoded on the wire; the resource works with plain UTF‑8.
 
-### openwrt_ipkg_package
+#### openwrt_ipkg_package
 
 Ensure a package is installed using `/rpc/ipkg`:
 
@@ -107,7 +109,248 @@ resource "openwrt_ipkg_package" "luci_mod_rpc" {
 }
 ```
 
-### openwrt_sys_rpc (data source)
+### Network Resources
+
+#### openwrt_network_interface
+
+Manages a network interface (LAN, WAN, etc.):
+
+```hcl
+resource "openwrt_network_interface" "lan" {
+  name    = "lan"
+  proto   = "static"
+  device  = "br-lan"
+  ipaddr  = "192.168.1.1/24"
+  gateway = "192.168.1.254"
+  dns     = "8.8.8.8 8.8.4.4"
+  metric  = 100
+  auto    = "1"
+}
+```
+
+#### openwrt_network_device
+
+Manages network devices (bridges, bonding):
+
+```hcl
+resource "openwrt_network_device" "br_lan" {
+  name  = "br-lan"
+  type  = "bridge"
+  ports = "eth0 eth1"
+}
+
+resource "openwrt_network_device" "bond0" {
+  name            = "bond0"
+  type            = "bonding"
+  ports           = "eth1 eth2"
+  policy          = "802.3ad"
+  xmit_hash_policy = "layer2+3"
+}
+```
+
+#### openwrt_network_wireguard
+
+Manages WireGuard VPN peers:
+
+```hcl
+resource "openwrt_network_wireguard" "peer1" {
+  name                  = "wgclient1"
+  description           = "Remote peer 1"
+  public_key            = "ABC123...="
+  endpoint_host         = "vpn.example.com"
+  endpoint_port         = 51820
+  persistent_keepalive  = 25
+  allowed_ips           = "10.0.0.2/32 10.0.0.0/24"
+}
+```
+
+### Firewall Resources
+
+#### openwrt_firewall_zone
+
+Manages firewall zones:
+
+```hcl
+resource "openwrt_firewall_zone" "lan" {
+  name     = "lan"
+  input    = "ACCEPT"
+  output   = "ACCEPT"
+  forward  = "REJECT"
+  masq     = false
+  network  = "lan"
+}
+```
+
+#### openwrt_firewall_rule
+
+Manages firewall rules:
+
+```hcl
+resource "openwrt_firewall_rule" "allow_dns" {
+  name      = "Allow-DNS"
+  src       = "guest"
+  dest_port = "53"
+  proto     = "tcpudp"
+  target    = "ACCEPT"
+}
+
+resource "openwrt_firewall_rule" "allow_http" {
+  name        = "Allow-HTTP"
+  src         = "wan"
+  dest        = "lan"
+  dest_port   = "80"
+  proto       = "tcp"
+  target      = "ACCEPT"
+  src_ip      = "192.168.1.0/24"
+}
+```
+
+#### openwrt_firewall_forwarding
+
+Manages zone-to-zone traffic forwarding:
+
+```hcl
+resource "openwrt_firewall_forwarding" "lan_to_wan" {
+  src  = "lan"
+  dest = "wan"
+}
+
+resource "openwrt_firewall_forwarding" "guest_to_wan" {
+  src  = "guest"
+  dest = "wan"
+}
+```
+
+### DHCP Resources
+
+#### openwrt_dhcp_pool
+
+Manages DHCP pools for network interfaces:
+
+```hcl
+resource "openwrt_dhcp_pool" "lan" {
+  name      = "lan"
+  interface = "lan"
+  start     = 100
+  limit     = 150
+  leasetime = "12h"
+  dhcpv4    = "server"
+  ra        = "server"
+  ra_flags  = "managed-config other-config"
+}
+```
+
+#### openwrt_dhcp_dnsmasq
+
+Manages DNS/DHCP server (dnsmasq) settings:
+
+```hcl
+resource "openwrt_dhcp_dnsmasq" "main" {
+  domainneeded     = true
+  rebind_protection = true
+  rebind_localhost  = true
+  local            = "/lan/"
+  domain           = "lan"
+  expand_hosts     = true
+  cachesize        = 1000
+  authoritative    = true
+  readethers       = true
+  leasefile        = "/tmp/dhcp.leases"
+  resolvfile       = "/tmp/resolv.conf.d/resolv.conf.auto"
+  localservice     = true
+  ednspacket_max   = 1232
+  server           = "8.8.8.8 8.8.4.4"
+}
+```
+
+#### openwrt_dhcp_host
+
+Manages static DHCP host reservations:
+
+```hcl
+resource "openwrt_dhcp_host" "server" {
+  name      = "fileserver"
+  ip        = "192.168.1.100"
+  mac       = "00:11:22:33:44:55"
+  leasetime = "infinite"
+}
+```
+
+### Wireless Resources
+
+#### openwrt_wireless_device
+
+Manages wireless radio devices:
+
+```hcl
+resource "openwrt_wireless_device" "radio0" {
+  name     = "radio0"
+  type     = "mac80211"
+  path     = "pci0000:00/0000:00:02.5/0000:04:00.0"
+  band     = "5g"
+  channel  = 44
+  htmode   = "VHT80"
+  country  = "DE"
+  disabled = false
+}
+```
+
+#### openwrt_wireless_iface
+
+Manages wireless interfaces (SSIDs):
+
+```hcl
+resource "openwrt_wireless_iface" "main" {
+  name        = "wifinet0"
+  device      = "radio0"
+  mode        = "ap"
+  ssid        = "MyNetwork"
+  encryption  = "psk2"
+  key         = "secretpassword"
+  network     = "lan"
+  hidden      = false
+  isolate     = false
+}
+```
+
+### System Resources
+
+#### openwrt_system
+
+Manages system settings:
+
+```hcl
+resource "openwrt_system" "main" {
+  hostname     = "openwrt-router"
+  ttylogin     = false
+  log_size     = 128
+  urandom_seed = true
+  zonename     = "UTC"
+  log_proto    = "udp"
+  conloglevel  = "8"
+  cronloglevel = "7"
+}
+```
+
+### SSH Resources
+
+#### openwrt_dropbear
+
+Manages Dropbear SSH server settings:
+
+```hcl
+resource "openwrt_dropbear" "main" {
+  name             = "main"
+  password_auth    = false
+  port             = 22
+  root_password_auth = true
+  root_login       = true
+}
+```
+
+### Data Sources
+
+#### openwrt_sys_rpc
 
 Low‑level `/rpc/sys` access:
 
@@ -140,10 +383,11 @@ output "routes" {
 
 ## Limitations and TODOs
 
-- Only a subset of UCI and ipkg RPC functions are wrapped.
-- /rpc/sys is exposed generically; for convenience, typed data sources (e.g. openwrt_sys_hostname, openwrt_sys_routes) can be added.
 - LuCI path is fixed to /cgi-bin/luci; making it configurable is a future enhancement.
 - TLS options are limited to insecure; supporting CA bundles and client certs would be useful for production.
+- Unit tests for typed resources are not yet implemented.
+- Acceptance tests require a live OpenWrt device.
+- Import support could be extended for additional resources.
 
 ## License
 
