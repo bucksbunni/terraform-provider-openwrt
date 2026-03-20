@@ -116,19 +116,25 @@ func (p *openwrtProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewFirewallRuleResource,
 		NewFirewallZoneResource,
 		NewFirewallForwardingResource,
+		NewFirewallDefaultsResource,
 
 		// Network
 		NewNetworkInterfaceResource,
 		NewNetworkDeviceResource,
+		NewNetworkBridgeVlanResource,
+		NewNetworkGlobalsResource,
 		NewNetworkWireguardResource,
 
 		// DHCP
 		NewDHCPPoolResource,
 		NewDHCPDNSMasqResource,
+		NewDHCPOdhcpdResource,
 		NewDHCPHostResource,
 
 		// System
 		NewSystemResource,
+		NewSystemNTPResource,
+		NewSystemLEDResource,
 
 		// Dropbear (SSH)
 		NewDropbearResource,
@@ -136,6 +142,13 @@ func (p *openwrtProvider) Resources(_ context.Context) []func() resource.Resourc
 		// Wireless
 		NewWirelessDeviceResource,
 		NewWirelessInterfaceResource,
+
+		// uHTTPd (Web Server)
+		NewUHTTPdResource,
+		NewUHTTPdCertResource,
+
+		// RPC Daemon
+		NewRPCDResource,
 	}
 }
 
