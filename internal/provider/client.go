@@ -585,6 +585,12 @@ func (c *JsonRpcClient) UCIForeach(ctx context.Context, config, typ string) ([]m
 	return result, nil
 }
 
+// UCIRename renames a section.
+func (c *JsonRpcClient) UCIRename(ctx context.Context, config, section, newName string) error {
+	_, err := c.call(ctx, "uci", "rename", config, section, newName)
+	return err
+}
+
 // UCISet sets a value or creates a named section.
 // See luci.model.uci.set() docs for details.
 func (c *JsonRpcClient) UCISet(ctx context.Context, config, section, option string, value interface{}) error {
