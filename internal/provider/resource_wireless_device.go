@@ -142,8 +142,21 @@ func (r *wirelessDeviceResource) Read(ctx context.Context, req resource.ReadRequ
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "wireless", name)
-	if err != nil || len(data) == 0 {
+	devices, err := r.client.UCIForeach(ctx, "wireless", "wifi-device")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading wireless devices", err.Error())
+		return
+	}
+
+	var data map[string]interface{}
+	for _, dev := range devices {
+		if dev[".name"] == name {
+			data = dev
+			break
+		}
+	}
+
+	if data == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}

@@ -26,7 +26,6 @@ type fsFileModel struct {
 	ID      types.String `tfsdk:"id"`
 	Path    types.String `tfsdk:"path"`
 	Content types.String `tfsdk:"content"`
-	// You can add mode, owner, group as needed and use fs.chmod/fs.chown.
 }
 
 func (r *fsFileResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {

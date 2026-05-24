@@ -12,13 +12,20 @@ import (
 	"time"
 )
 
+// JsonRpcConfig holds the configuration for creating a JSON-RPC client.
 type JsonRpcConfig struct {
-	BaseURL  string
+	// BaseURL is the URL of the LuCI RPC endpoint (e.g., http://192.168.1.1).
+	BaseURL string
+	// Username is the OpenWrt login username (typically 'root').
 	Username string
+	// Password is the OpenWrt login password.
 	Password string
+	// Insecure controls TLS certificate verification for HTTPS connections.
 	Insecure bool
 }
 
+// JsonRpcClient provides access to the OpenWrt LuCI JSON-RPC API.
+// It handles authentication and provides methods for UCI, filesystem, and system operations.
 type JsonRpcClient struct {
 	baseURL  *url.URL
 	username string
@@ -31,6 +38,8 @@ type JsonRpcClient struct {
 	id    int64
 }
 
+// NewJsonRpcClient creates a new JSON-RPC client for communicating with OpenWrt's LuCI API.
+// It validates the configuration and sets up the HTTP client.
 func NewJsonRpcClient(ctx context.Context, cfg JsonRpcConfig) (*JsonRpcClient, error) {
 	if cfg.BaseURL == "" {
 		return nil, fmt.Errorf("BaseURL is required")
@@ -481,6 +490,12 @@ func (c *JsonRpcClient) UCIAdd(ctx context.Context, config, typ string) (string,
 	return name, nil
 }
 
+// UCISetSection creates or updates a named section (e.g., uci set network test interface).
+func (c *JsonRpcClient) UCISetSection(ctx context.Context, config, section, typ string) error {
+	_, err := c.call(ctx, "uci", "set", config, section, typ)
+	return err
+}
+
 // UCIChanges returns the table of saved but uncommitted changes.
 // If config is empty, changes for all configs are returned.
 func (c *JsonRpcClient) UCIChanges(ctx context.Context, config string) (map[string]interface{}, error) {
@@ -568,6 +583,12 @@ func (c *JsonRpcClient) UCIForeach(ctx context.Context, config, typ string) ([]m
 		return nil, fmt.Errorf("decode UCI foreach: %w", err)
 	}
 	return result, nil
+}
+
+// UCIRename renames a section.
+func (c *JsonRpcClient) UCIRename(ctx context.Context, config, section, newName string) error {
+	_, err := c.call(ctx, "uci", "rename", config, section, newName)
+	return err
 }
 
 // UCISet sets a value or creates a named section.

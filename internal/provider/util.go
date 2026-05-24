@@ -2,7 +2,8 @@ package provider
 
 import "github.com/hashicorp/terraform-plugin-framework/types"
 
-// helper to read string options
+// StringOption reads a string option from a raw UCI response map.
+// Returns a null String if the key is not found or the value is not a string.
 func StringOption(raw map[string]interface{}, key string) types.String {
 	if v, ok := raw[key]; ok {
 		if s, ok := v.(string); ok {

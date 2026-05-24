@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -127,9 +128,21 @@ func (r *dhcpPoolResource) Create(ctx context.Context, req resource.CreateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	_, err := r.client.UCISection(ctx, "dhcp", "dhcp", name, options)
+	secName, err := r.client.UCIAdd(ctx, "dhcp", "dhcp")
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating DHCP pool", err.Error())
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "dhcp", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error setting DHCP pool option", err.Error())
+			return
+		}
+	}
+
+	if err := r.client.UCISet(ctx, "dhcp", secName, "name", name); err != nil {
+		resp.Diagnostics.AddError("Error setting DHCP pool name", err.Error())
 		return
 	}
 
@@ -155,8 +168,22 @@ func (r *dhcpPoolResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "dhcp", name)
-	if err != nil || len(data) == 0 {
+	pools, err := r.client.UCIForeach(ctx, "dhcp", "dhcp")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
+		return
+	}
+
+	var data map[string]interface{}
+	for _, pool := range pools {
+		nameVal, ok := pool["name"].(string)
+		if ok && nameVal == name {
+			data = pool
+			break
+		}
+	}
+
+	if data == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -180,9 +207,30 @@ func (r *dhcpPoolResource) Update(ctx context.Context, req resource.UpdateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	if err := r.client.UCITSet(ctx, "dhcp", name, options); err != nil {
-		resp.Diagnostics.AddError("Error updating DHCP pool", err.Error())
+	pools, err := r.client.UCIForeach(ctx, "dhcp", "dhcp")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
 		return
+	}
+
+	var secName string
+	for _, p := range pools {
+		if p["name"] == name {
+			secName = p[".name"].(string)
+			break
+		}
+	}
+
+	if secName == "" {
+		resp.Diagnostics.AddError("Error finding DHCP pool", "pool not found")
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "dhcp", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating DHCP pool option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "dhcp"); err != nil {
@@ -192,6 +240,8 @@ func (r *dhcpPoolResource) Update(ctx context.Context, req resource.UpdateReques
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("dhcp/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -205,16 +255,32 @@ func (r *dhcpPoolResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	name := state.Name.ValueString()
 
-	if err := r.client.UCIDelete(ctx, "dhcp", name); err != nil {
-		resp.Diagnostics.AddError("Error deleting DHCP pool", err.Error())
+	pools, err := r.client.UCIForeach(ctx, "dhcp", "dhcp")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
 		return
 	}
-	if err := r.client.UCICommit(ctx, "dhcp"); err != nil {
-		resp.Diagnostics.AddError("Error committing DHCP config", err.Error())
-		return
+
+	var secName string
+	for _, p := range pools {
+		if p["name"] == name {
+			secName = p[".name"].(string)
+			break
+		}
 	}
-	if err := r.client.UCIApply(ctx, false); err != nil {
-		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+
+	if secName != "" {
+		if err := r.client.UCIDelete(ctx, "dhcp", secName); err != nil {
+			resp.Diagnostics.AddError("Error deleting DHCP pool", err.Error())
+			return
+		}
+		if err := r.client.UCICommit(ctx, "dhcp"); err != nil {
+			resp.Diagnostics.AddError("Error committing DHCP config", err.Error())
+			return
+		}
+		if err := r.client.UCIApply(ctx, false); err != nil {
+			tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+		}
 	}
 
 	resp.State.RemoveResource(ctx)
@@ -271,7 +337,9 @@ func (r *dhcpPoolResource) modelToOptions(plan dhcpPoolModel) map[string]interfa
 }
 
 func (r *dhcpPoolResource) optionsToModel(data map[string]interface{}, state *dhcpPoolModel) {
-	if v, ok := data[".name"].(string); ok {
+	if v, ok := data["name"].(string); ok {
+		state.Name = types.StringValue(v)
+	} else if v, ok := data[".name"].(string); ok {
 		state.Name = types.StringValue(v)
 	}
 	if v, ok := data["interface"].(string); ok {
@@ -280,18 +348,34 @@ func (r *dhcpPoolResource) optionsToModel(data map[string]interface{}, state *dh
 	if v, ok := data["start"]; ok {
 		if f, ok := v.(float64); ok {
 			state.Start = types.Int64Value(int64(f))
+		} else if s, ok := v.(string); ok {
+			if i, err := strconv.Atoi(s); err == nil {
+				state.Start = types.Int64Value(int64(i))
+			}
 		}
+	} else {
+		state.Start = types.Int64Value(100)
 	}
 	if v, ok := data["limit"]; ok {
 		if f, ok := v.(float64); ok {
 			state.Limit = types.Int64Value(int64(f))
+		} else if s, ok := v.(string); ok {
+			if i, err := strconv.Atoi(s); err == nil {
+				state.Limit = types.Int64Value(int64(i))
+			}
 		}
+	} else {
+		state.Limit = types.Int64Value(150)
 	}
 	if v, ok := data["leasetime"].(string); ok {
 		state.Leasetime = types.StringValue(v)
+	} else {
+		state.Leasetime = types.StringValue("12h")
 	}
 	if v, ok := data["dhcpv4"].(string); ok {
 		state.DHCPv4 = types.StringValue(v)
+	} else {
+		state.DHCPv4 = types.StringValue("server")
 	}
 	if v, ok := data["dhcpv6"].(string); ok {
 		state.DHCPv6 = types.StringValue(v)

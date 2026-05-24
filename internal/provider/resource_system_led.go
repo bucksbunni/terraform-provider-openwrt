@@ -97,9 +97,21 @@ func (r *systemLEDResource) Create(ctx context.Context, req resource.CreateReque
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	_, err := r.client.UCISection(ctx, "system", "led", name, options)
+	secName, err := r.client.UCIAdd(ctx, "system", "led")
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating LED config", err.Error())
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "system", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error setting LED option", err.Error())
+			return
+		}
+	}
+
+	if err := r.client.UCISet(ctx, "system", secName, "name", name); err != nil {
+		resp.Diagnostics.AddError("Error setting LED name", err.Error())
 		return
 	}
 
@@ -125,8 +137,21 @@ func (r *systemLEDResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "system", name)
-	if err != nil || len(data) == 0 {
+	leds, err := r.client.UCIForeach(ctx, "system", "led")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading LED configs", err.Error())
+		return
+	}
+
+	var data map[string]interface{}
+	for _, led := range leds {
+		if led["name"] == name {
+			data = led
+			break
+		}
+	}
+
+	if data == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -150,9 +175,30 @@ func (r *systemLEDResource) Update(ctx context.Context, req resource.UpdateReque
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	if err := r.client.UCITSet(ctx, "system", name, options); err != nil {
-		resp.Diagnostics.AddError("Error updating LED config", err.Error())
+	leds, err := r.client.UCIForeach(ctx, "system", "led")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading LED configs", err.Error())
 		return
+	}
+
+	var secName string
+	for _, led := range leds {
+		if led["name"] == name {
+			secName = led[".name"].(string)
+			break
+		}
+	}
+
+	if secName == "" {
+		resp.Diagnostics.AddError("Error finding LED config", "LED not found")
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "system", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating LED option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "system"); err != nil {
@@ -162,6 +208,8 @@ func (r *systemLEDResource) Update(ctx context.Context, req resource.UpdateReque
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("system/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -175,16 +223,32 @@ func (r *systemLEDResource) Delete(ctx context.Context, req resource.DeleteReque
 
 	name := state.Name.ValueString()
 
-	if err := r.client.UCIDelete(ctx, "system", name); err != nil {
-		resp.Diagnostics.AddError("Error deleting LED config", err.Error())
+	leds, err := r.client.UCIForeach(ctx, "system", "led")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading LED configs", err.Error())
 		return
 	}
-	if err := r.client.UCICommit(ctx, "system"); err != nil {
-		resp.Diagnostics.AddError("Error committing system config", err.Error())
-		return
+
+	var secName string
+	for _, led := range leds {
+		if led["name"] == name {
+			secName = led[".name"].(string)
+			break
+		}
 	}
-	if err := r.client.UCIApply(ctx, false); err != nil {
-		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+
+	if secName != "" {
+		if err := r.client.UCIDelete(ctx, "system", secName); err != nil {
+			resp.Diagnostics.AddError("Error deleting LED config", err.Error())
+			return
+		}
+		if err := r.client.UCICommit(ctx, "system"); err != nil {
+			resp.Diagnostics.AddError("Error committing system config", err.Error())
+			return
+		}
+		if err := r.client.UCIApply(ctx, false); err != nil {
+			tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+		}
 	}
 
 	resp.State.RemoveResource(ctx)

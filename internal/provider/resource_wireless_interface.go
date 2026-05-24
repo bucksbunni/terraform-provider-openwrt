@@ -165,8 +165,21 @@ func (r *wirelessInterfaceResource) Read(ctx context.Context, req resource.ReadR
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "wireless", name)
-	if err != nil || len(data) == 0 {
+	ifaces, err := r.client.UCIForeach(ctx, "wireless", "wifi-iface")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading wireless interfaces", err.Error())
+		return
+	}
+
+	var data map[string]interface{}
+	for _, iface := range ifaces {
+		if iface[".name"] == name {
+			data = iface
+			break
+		}
+	}
+
+	if data == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}

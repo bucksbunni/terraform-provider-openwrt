@@ -2,6 +2,8 @@
 
 This directory contains Terraform configurations for managing OpenWrt wireless radios and SSIDs.
 
+-> **Note**: Wireless setup requires kernel modules and firmware. See the [Wireless Setup Guide](../../docs/guides/wireless-setup.md) for prerequisites and installation instructions.
+
 ## Files
 
 - `main.tf` - Complete wireless configuration with provider setup

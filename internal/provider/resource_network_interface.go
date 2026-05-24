@@ -150,14 +150,18 @@ func (r *networkInterfaceResource) Create(ctx context.Context, req resource.Crea
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	secName, err := r.client.UCISection(ctx, "network", "interface", name, options)
-	if err != nil {
+	tflog.Debug(ctx, "Creating network interface", map[string]interface{}{"name": name})
+
+	if err := r.client.UCISetSection(ctx, "network", name, "interface"); err != nil {
 		resp.Diagnostics.AddError("Error creating network interface", err.Error())
 		return
 	}
 
-	if name == "" {
-		name = secName
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "network", name, key, value); err != nil {
+			resp.Diagnostics.AddError("Error setting network interface option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "network"); err != nil {
@@ -182,8 +186,21 @@ func (r *networkInterfaceResource) Read(ctx context.Context, req resource.ReadRe
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "network", name)
-	if err != nil || len(data) == 0 {
+	ifaces, err := r.client.UCIForeach(ctx, "network", "interface")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading network interfaces", err.Error())
+		return
+	}
+
+	var data map[string]interface{}
+	for _, iface := range ifaces {
+		if iface[".name"] == name {
+			data = iface
+			break
+		}
+	}
+
+	if data == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -207,9 +224,30 @@ func (r *networkInterfaceResource) Update(ctx context.Context, req resource.Upda
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	if err := r.client.UCITSet(ctx, "network", name, options); err != nil {
-		resp.Diagnostics.AddError("Error updating network interface", err.Error())
+	ifaces, err := r.client.UCIForeach(ctx, "network", "interface")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading network interfaces", err.Error())
 		return
+	}
+
+	var secName string
+	for _, iface := range ifaces {
+		if iface["name"] == name {
+			secName = iface[".name"].(string)
+			break
+		}
+	}
+
+	if secName == "" {
+		resp.Diagnostics.AddError("Error finding network interface", "interface not found")
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "network", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating network interface option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "network"); err != nil {
@@ -219,6 +257,8 @@ func (r *networkInterfaceResource) Update(ctx context.Context, req resource.Upda
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("network/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
