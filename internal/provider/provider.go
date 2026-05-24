@@ -11,12 +11,18 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+// openwrtProvider implements the terraform-plugin-framework provider.Provider interface.
+// It manages OpenWrt devices through the LuCI JSON-RPC API.
 var _ provider.Provider = &openwrtProvider{}
 
+// openwrtProvider is the main provider struct that holds configuration
+// and provides access to the JSON-RPC client.
 type openwrtProvider struct {
 	version string
 }
 
+// NewProvider returns a function that creates a new OpenWrt provider instance.
+// The version parameter is used for provider versioning information.
 func NewProvider(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &openwrtProvider{
