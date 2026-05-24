@@ -18,6 +18,7 @@ All notable changes to the terraform-provider-openwrt will be documented in this
 - Sys hostname data source (openwrt_sys_hostname)
 - Sys wireless data source (openwrt_sys_wireless)
 - Sys wireless info data source (openwrt_sys_wireless_info)
+- Supports reading configuration from environment variables
 
 ### Fixed
 
