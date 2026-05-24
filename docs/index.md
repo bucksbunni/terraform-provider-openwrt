@@ -51,21 +51,21 @@ provider "openwrt" {
 
 ## Guides
 
-- [Wireless Setup Guide](guides/wireless-setup.html) - Installing wireless drivers and configuring WiFi
+- [Wireless Setup Guide](guides/wireless-setup.md) - Installing wireless drivers and configuring WiFi
 
 ## Resources
 
-- [Network Resources](resources/network.html) - Interfaces, devices, bridges, VLANs, WireGuard
-- [Firewall Resources](resources/firewall.html) - Zones, rules, forwarding
-- [DHCP Resources](resources/dhcp.html) - DHCP pools, dnsmasq, static reservations
-- [Wireless Resources](resources/wireless.html) - Radio devices and SSIDs
-- [System Resources](resources/system.html) - System settings, NTP, LEDs
-- [Generic Resources](resources/generic.html) - UCI sections, files, packages
+- [Network Resources](resources/network.md) - Interfaces, devices, bridges, VLANs, WireGuard
+- [Firewall Resources](resources/firewall.md) - Zones, rules, forwarding
+- [DHCP Resources](resources/dhcp.md) - DHCP pools, dnsmasq, static reservations
+- [Wireless Resources](resources/wireless.md) - Radio devices and SSIDs (see examples/wireless)
+- [System Resources](resources/system.md) - System settings, NTP, LEDs
+- [Generic Resources](resources/generic.md) - UCI sections, files, packages
 
 ## Data Sources
 
-- [System Data Sources](data-sources/sys.html) - Hostname, uptime, processes
-- [Network Data Sources](data-sources/network.html) - Devices, routes, ARP table
+- [System Data Sources](data-sources/sys.md) - Hostname, uptime, processes
+- [Network Data Sources](data-sources/network.md) - Devices, routes, ARP table
 
 ## Environment Variables
 
