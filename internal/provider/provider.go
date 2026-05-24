@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -76,11 +77,27 @@ func (p *openwrtProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
+	// Get provider configuration
 	host := config.Host.ValueString()
 	user := config.Username.ValueString()
 	pass := config.Password.ValueString()
 	insecure := config.Insecure.ValueBool()
 
+	// If variables are not available try to get them from the environment
+	if host == "" {
+		host = os.Getenv("OPENWRT_HOST")
+	}
+	if user == "" {
+		user = os.Getenv("OPENWRT_USERNAME")
+	}
+	if pass == "" {
+		pass = os.Getenv("OPENWRT_PASSWORD")
+	}
+	if os.Getenv("OPENWRT_INSECURE") != "" {
+		insecure = os.Getenv("OPENWRT_INSECURE") == "true"
+	}
+
+	// Fail for missing credentials
 	if host == "" || user == "" || pass == "" {
 		resp.Diagnostics.AddError(
 			"Missing configuration",
@@ -89,6 +106,7 @@ func (p *openwrtProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
+	// Create a new client for the provider for operation
 	client, err := NewJsonRpcClient(ctx, JsonRpcConfig{
 		BaseURL:  host,
 		Username: user,
