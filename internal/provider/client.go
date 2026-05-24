@@ -490,6 +490,12 @@ func (c *JsonRpcClient) UCIAdd(ctx context.Context, config, typ string) (string,
 	return name, nil
 }
 
+// UCISetSection creates or updates a named section (e.g., uci set network test interface).
+func (c *JsonRpcClient) UCISetSection(ctx context.Context, config, section, typ string) error {
+	_, err := c.call(ctx, "uci", "set", config, section, typ)
+	return err
+}
+
 // UCIChanges returns the table of saved but uncommitted changes.
 // If config is empty, changes for all configs are returned.
 func (c *JsonRpcClient) UCIChanges(ctx context.Context, config string) (map[string]interface{}, error) {
