@@ -2,16 +2,15 @@
 
 This provider manages OpenWrt devices via the LuCI JSON‑RPC API.
 
-It wraps the following LuCI RPC libraries:
+-> **WARNING: All features are highly experimental!** Use in production at your own risk.
 
-- `/cgi-bin/luci/rpc/uci` – UCI configuration
-- `/cgi-bin/luci/rpc/fs` – filesystem operations
-- `/cgi-bin/luci/rpc/sys` – system info and utilities
-- `/cgi-bin/luci/rpc/ipkg` – package manager (opkg)
+## Documentation
 
-The upstream JSON‑RPC behaviour is documented in `JsonRpcHowTo.md` of the [LuCI Wiki](https://github.com/openwrt/luci/wiki).
+Full documentation is available in the [`docs/`](docs/) directory:
 
-> **WARNING: All features are highly experimental!** Full testing has not been done yet. Use in production at your own risk.
+- [Provider Index](docs/index.md) - Overview, prerequisites, quick start
+- [Wireless Setup Guide](docs/guides/wireless-setup.md) - Installing wireless drivers
+- [Examples](examples/) - Complete Terraform configurations
 
 ## Requirements
 
@@ -23,11 +22,6 @@ opkg install luci-mod-rpc luci-lib-ipkg luci-compat
 /etc/init.d/uhttpd restart
 ```
 
-Ensure LuCI is reachable at something like:
-
-- http://192.168.1.1/cgi-bin/luci
-- or https://router.example/cgi-bin/luci
-
 ## Installation
 
 Build the provider binary:
@@ -36,9 +30,7 @@ Build the provider binary:
 go build ./...
 ```
 
-Place `terraform-provider-openwrt` in your Terraform plugin directory or use terraform init with `source = "bucksbunni/openwrt"` once this provider becomes available.
-
-## Provider configuration
+## Quick Start
 
 ```hcl
 terraform {
@@ -54,7 +46,7 @@ provider "openwrt" {
   host     = "http://192.168.1.1"
   username = "root"
   password = "yourpassword"
-  insecure = true # only if using self-signed HTTPS
+  insecure = true
 }
 ```
 
@@ -338,31 +330,7 @@ resource "openwrt_dhcp_odhcpd" "main" {
 
 ### Wireless Resources
 
-> **Prerequisite**: Wireless support requires kernel modules and firmware packages to be installed on the router. These vary by hardware chipset (Atheros, Broadcom, MediaTek, Intel, etc.) and must be installed separately using `openwrt_ipkg_package`.
-
-**Typical setup for Atheros hardware:**
-
-```hcl
-# Install kernel module and firmware
-resource "openwrt_ipkg_package" "ath10k_dkmod" {
-  name = "kmod-ath10k"
-}
-
-resource "openwrt_ipkg_package" "ath10k_fw" {
-  name = "ath10k-firmware-qca988x"
-}
-
-# Restart network to load the driver
-resource "openwrt_sys_rpc" "wifi_restart" {
-  method      = "init.restart"
-  params_json = jsonencode(["network"])
-}
-
-# Now configure wireless
-resource "openwrt_wireless_device" "radio0" {
-  # ...
-}
-```
+-> **Note**: Wireless setup requires kernel modules and firmware. See [Wireless Setup Guide](docs/guides/wireless-setup.md) for details.
 
 #### openwrt_wireless_device
 
@@ -675,7 +643,6 @@ See [`examples/README.md`](./examples/README.md) for usage instructions.
 
 - LuCI path is fixed to /cgi-bin/luci; making it configurable is a future enhancement.
 - TLS options are limited to insecure; supporting CA bundles and client certs would be useful for production.
-- Unit tests for typed resources are not yet implemented.
 - Acceptance tests require a live OpenWrt device.
 - Import support could be extended for additional resources.
 
