@@ -92,9 +92,21 @@ func (r *networkDeviceResource) Create(ctx context.Context, req resource.CreateR
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	_, err := r.client.UCISection(ctx, "network", "device", name, options)
+	secName, err := r.client.UCIAdd(ctx, "network", "device")
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating network device", err.Error())
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "network", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error setting network device option", err.Error())
+			return
+		}
+	}
+
+	if err := r.client.UCISet(ctx, "network", secName, "name", name); err != nil {
+		resp.Diagnostics.AddError("Error setting network device name", err.Error())
 		return
 	}
 
@@ -120,8 +132,21 @@ func (r *networkDeviceResource) Read(ctx context.Context, req resource.ReadReque
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "network", name)
-	if err != nil || len(data) == 0 {
+	devices, err := r.client.UCIForeach(ctx, "network", "device")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading network devices", err.Error())
+		return
+	}
+
+	var data map[string]interface{}
+	for _, dev := range devices {
+		if dev["name"] == name {
+			data = dev
+			break
+		}
+	}
+
+	if data == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -145,9 +170,30 @@ func (r *networkDeviceResource) Update(ctx context.Context, req resource.UpdateR
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	if err := r.client.UCITSet(ctx, "network", name, options); err != nil {
-		resp.Diagnostics.AddError("Error updating network device", err.Error())
+	devices, err := r.client.UCIForeach(ctx, "network", "device")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading network devices", err.Error())
 		return
+	}
+
+	var secName string
+	for _, dev := range devices {
+		if dev["name"] == name {
+			secName = dev[".name"].(string)
+			break
+		}
+	}
+
+	if secName == "" {
+		resp.Diagnostics.AddError("Error finding network device", "device not found")
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "network", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating network device option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "network"); err != nil {
@@ -157,6 +203,8 @@ func (r *networkDeviceResource) Update(ctx context.Context, req resource.UpdateR
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("network/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -170,16 +218,32 @@ func (r *networkDeviceResource) Delete(ctx context.Context, req resource.DeleteR
 
 	name := state.Name.ValueString()
 
-	if err := r.client.UCIDelete(ctx, "network", name); err != nil {
-		resp.Diagnostics.AddError("Error deleting network device", err.Error())
+	devices, err := r.client.UCIForeach(ctx, "network", "device")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading network devices", err.Error())
 		return
 	}
-	if err := r.client.UCICommit(ctx, "network"); err != nil {
-		resp.Diagnostics.AddError("Error committing network config", err.Error())
-		return
+
+	var secName string
+	for _, dev := range devices {
+		if dev["name"] == name {
+			secName = dev[".name"].(string)
+			break
+		}
 	}
-	if err := r.client.UCIApply(ctx, false); err != nil {
-		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+
+	if secName != "" {
+		if err := r.client.UCIDelete(ctx, "network", secName); err != nil {
+			resp.Diagnostics.AddError("Error deleting network device", err.Error())
+			return
+		}
+		if err := r.client.UCICommit(ctx, "network"); err != nil {
+			resp.Diagnostics.AddError("Error committing network config", err.Error())
+			return
+		}
+		if err := r.client.UCIApply(ctx, false); err != nil {
+			tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+		}
 	}
 
 	resp.State.RemoveResource(ctx)

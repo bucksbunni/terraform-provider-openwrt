@@ -92,9 +92,21 @@ func (r *dropbearResource) Create(ctx context.Context, req resource.CreateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	_, err := r.client.UCISection(ctx, "dropbear", "dropbear", name, options)
+	secName, err := r.client.UCIAdd(ctx, "dropbear", "dropbear")
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating dropbear config", err.Error())
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "dropbear", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error setting dropbear option", err.Error())
+			return
+		}
+	}
+
+	if err := r.client.UCISet(ctx, "dropbear", secName, "name", name); err != nil {
+		resp.Diagnostics.AddError("Error setting dropbear name", err.Error())
 		return
 	}
 
@@ -120,8 +132,21 @@ func (r *dropbearResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "dropbear", name)
-	if err != nil || len(data) == 0 {
+	instances, err := r.client.UCIForeach(ctx, "dropbear", "dropbear")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
+		return
+	}
+
+	var data map[string]interface{}
+	for _, inst := range instances {
+		if inst["name"] == name {
+			data = inst
+			break
+		}
+	}
+
+	if data == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -145,9 +170,30 @@ func (r *dropbearResource) Update(ctx context.Context, req resource.UpdateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	if err := r.client.UCITSet(ctx, "dropbear", name, options); err != nil {
-		resp.Diagnostics.AddError("Error updating dropbear config", err.Error())
+	instances, err := r.client.UCIForeach(ctx, "dropbear", "dropbear")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
 		return
+	}
+
+	var secName string
+	for _, inst := range instances {
+		if inst["name"] == name {
+			secName = inst[".name"].(string)
+			break
+		}
+	}
+
+	if secName == "" {
+		resp.Diagnostics.AddError("Error finding dropbear config", "instance not found")
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "dropbear", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating dropbear option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "dropbear"); err != nil {
@@ -157,6 +203,8 @@ func (r *dropbearResource) Update(ctx context.Context, req resource.UpdateReques
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("dropbear/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -170,7 +218,22 @@ func (r *dropbearResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	name := state.Name.ValueString()
 
-	if err := r.client.UCIDelete(ctx, "dropbear", name); err != nil {
+	instances, err := r.client.UCIForeach(ctx, "dropbear", "dropbear")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
+		return
+	}
+
+	var secName string
+	for _, inst := range instances {
+		if inst["name"] == name {
+			secName = inst[".name"].(string)
+			break
+		}
+	}
+
+	if secName != "" {
+		if err := r.client.UCIDelete(ctx, "dropbear", secName); err != nil {
 		resp.Diagnostics.AddError("Error deleting dropbear config", err.Error())
 		return
 	}
@@ -180,6 +243,7 @@ func (r *dropbearResource) Delete(ctx context.Context, req resource.DeleteReques
 	}
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+		}
 	}
 
 	resp.State.RemoveResource(ctx)

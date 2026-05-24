@@ -58,19 +58,16 @@ func (r *firewallZoneResource) Schema(_ context.Context, _ resource.SchemaReques
 			"input": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("ACCEPT"),
 				Description: "Input policy: 'ACCEPT', 'REJECT', 'DROP'.",
 			},
 			"output": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("ACCEPT"),
 				Description: "Output policy: 'ACCEPT', 'REJECT', 'DROP'.",
 			},
 			"forward": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("REJECT"),
 				Description: "Forward policy: 'ACCEPT', 'REJECT', 'DROP'.",
 			},
 			"masq": schema.BoolAttribute{
@@ -119,14 +116,31 @@ func (r *firewallZoneResource) Create(ctx context.Context, req resource.CreateRe
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	secName, err := r.client.UCISection(ctx, "firewall", "zone", name, options)
+	tflog.Debug(ctx, "Creating firewall zone", map[string]interface{}{"name": name, "options": options})
+
+	// For firewall zones, we need to use add to create an anonymous section first
+	// then set the name option
+	secName, err := r.client.UCIAdd(ctx, "firewall", "zone")
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating firewall zone", err.Error())
 		return
 	}
 
-	if name == "" {
-		name = secName
+	tflog.Debug(ctx, "UCIAdd returned", map[string]interface{}{"secName": secName})
+
+	// Now set all the options including name
+	for key, value := range options {
+		tflog.Debug(ctx, "UCISet", map[string]interface{}{"key": key, "value": value, "secName": secName})
+		if err := r.client.UCISet(ctx, "firewall", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error setting firewall zone option", err.Error())
+			return
+		}
+	}
+
+	// Set the name explicitly
+	if err := r.client.UCISet(ctx, "firewall", secName, "name", name); err != nil {
+		resp.Diagnostics.AddError("Error setting firewall zone name", err.Error())
+		return
 	}
 
 	if err := r.client.UCICommit(ctx, "firewall"); err != nil {
@@ -135,6 +149,13 @@ func (r *firewallZoneResource) Create(ctx context.Context, req resource.CreateRe
 	}
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+	}
+
+	// Verify the zone was created
+	zones, _ := r.client.UCIForeach(ctx, "firewall", "zone")
+	tflog.Debug(ctx, "Zones after create", map[string]interface{}{"count": len(zones)})
+	for _, z := range zones {
+		tflog.Debug(ctx, "Zone", map[string]interface{}{"name": z["name"]})
 	}
 
 	plan.ID = types.StringValue(fmt.Sprintf("firewall/%s", name))
@@ -150,15 +171,39 @@ func (r *firewallZoneResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	name := state.Name.ValueString()
+	tflog.Debug(ctx, "Read firewall zone", map[string]interface{}{"name": name, "id": state.ID.ValueString()})
 
-	data, err := r.client.UCIGetAll(ctx, "firewall", name)
-	if err != nil || len(data) == 0 {
+	zones, err := r.client.UCIForeach(ctx, "firewall", "zone")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading firewall zones", err.Error())
+		return
+	}
+
+	tflog.Debug(ctx, "Got zones", map[string]interface{}{"count": len(zones)})
+	for i, z := range zones {
+		tflog.Debug(ctx, "Zone", map[string]interface{}{"i": i, "name": z["name"], "type": z[".type"]})
+	}
+
+	var data map[string]interface{}
+	for _, zone := range zones {
+		if zoneName, ok := zone["name"].(string); ok && zoneName == name {
+			data = zone
+			break
+		}
+	}
+
+	if data == nil {
+		tflog.Debug(ctx, "Firewall zone not found, removing", map[string]interface{}{"name": name})
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
+	tflog.Debug(ctx, "Firewall zone data", map[string]interface{}{"data": data})
+
 	r.optionsToModel(data, &state)
 	state.ID = types.StringValue(fmt.Sprintf("firewall/%s", name))
+
+	tflog.Debug(ctx, "Firewall zone state after read", map[string]interface{}{"name": state.Name.ValueString(), "input": state.Input.ValueString(), "output": state.Output.ValueString(), "forward": state.Forward.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -176,9 +221,30 @@ func (r *firewallZoneResource) Update(ctx context.Context, req resource.UpdateRe
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	if err := r.client.UCITSet(ctx, "firewall", name, options); err != nil {
-		resp.Diagnostics.AddError("Error updating firewall zone", err.Error())
+	zones, err := r.client.UCIForeach(ctx, "firewall", "zone")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading firewall zones", err.Error())
 		return
+	}
+
+	var secName string
+	for _, z := range zones {
+		if z["name"] == name {
+			secName = z[".name"].(string)
+			break
+		}
+	}
+
+	if secName == "" {
+		resp.Diagnostics.AddError("Error finding firewall zone", "zone not found")
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "firewall", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating firewall zone option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "firewall"); err != nil {
@@ -188,6 +254,8 @@ func (r *firewallZoneResource) Update(ctx context.Context, req resource.UpdateRe
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("firewall/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -201,7 +269,22 @@ func (r *firewallZoneResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	name := state.Name.ValueString()
 
-	if err := r.client.UCIDelete(ctx, "firewall", name); err != nil {
+	zones, err := r.client.UCIForeach(ctx, "firewall", "zone")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading firewall zones", err.Error())
+		return
+	}
+
+	var secName string
+	for _, z := range zones {
+		if z["name"] == name {
+			secName = z[".name"].(string)
+			break
+		}
+	}
+
+	if secName != "" {
+		if err := r.client.UCIDelete(ctx, "firewall", secName); err != nil {
 		resp.Diagnostics.AddError("Error deleting firewall zone", err.Error())
 		return
 	}
@@ -211,6 +294,7 @@ func (r *firewallZoneResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+		}
 	}
 
 	resp.State.RemoveResource(ctx)
@@ -264,14 +348,23 @@ func (r *firewallZoneResource) modelToOptions(plan firewallZoneModel) map[string
 }
 
 func (r *firewallZoneResource) optionsToModel(data map[string]interface{}, state *firewallZoneModel) {
+	if v, ok := data["name"].(string); ok {
+		state.Name = types.StringValue(v)
+	}
 	if v, ok := data["input"].(string); ok {
 		state.Input = types.StringValue(v)
+	} else {
+		state.Input = types.StringValue("ACCEPT")
 	}
 	if v, ok := data["output"].(string); ok {
 		state.Output = types.StringValue(v)
+	} else {
+		state.Output = types.StringValue("ACCEPT")
 	}
 	if v, ok := data["forward"].(string); ok {
 		state.Forward = types.StringValue(v)
+	} else {
+		state.Forward = types.StringValue("REJECT")
 	}
 	if v, ok := data["masq"].(string); ok {
 		state.Masq = types.BoolValue(v == "1" || v == "true")
@@ -285,7 +378,16 @@ func (r *firewallZoneResource) optionsToModel(data map[string]interface{}, state
 	if v, ok := data["mtu_fix"].(string); ok {
 		state.MtuFix = types.BoolValue(v == "1" || v == "true")
 	}
-	if v, ok := data["network"].(string); ok {
-		state.Network = types.StringValue(v)
+	if v, ok := data["network"]; ok {
+		switch arr := v.(type) {
+		case []interface{}:
+			if len(arr) > 0 {
+				if s, ok := arr[0].(string); ok {
+					state.Network = types.StringValue(s)
+				}
+			}
+		case string:
+			state.Network = types.StringValue(arr)
+		}
 	}
 }

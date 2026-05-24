@@ -85,13 +85,23 @@ func (r *networkBridgeVlanResource) Create(ctx context.Context, req resource.Cre
 
 	device := plan.Device.ValueString()
 	vlan := plan.VLAN.ValueInt64()
-	vlanName := fmt.Sprintf("%s_%d", device, vlan)
 
-	options := r.modelToOptions(plan)
-
-	_, err := r.client.UCISection(ctx, "network", "bridge-vlan", vlanName, options)
+	sectionName, err := r.client.UCIAdd(ctx, "network", "bridge-vlan")
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating bridge VLAN", err.Error())
+		resp.Diagnostics.AddError("Error creating bridge VLAN section", err.Error())
+		return
+	}
+
+	if err := r.client.UCISet(ctx, "network", sectionName, "device", device); err != nil {
+		resp.Diagnostics.AddError("Error setting bridge VLAN device", err.Error())
+		return
+	}
+	if err := r.client.UCISet(ctx, "network", sectionName, "vlan", fmt.Sprintf("%d", vlan)); err != nil {
+		resp.Diagnostics.AddError("Error setting bridge VLAN id", err.Error())
+		return
+	}
+	if err := r.client.UCISet(ctx, "network", sectionName, "ports", plan.Ports.ValueString()); err != nil {
+		resp.Diagnostics.AddError("Error setting bridge VLAN ports", err.Error())
 		return
 	}
 
@@ -103,7 +113,7 @@ func (r *networkBridgeVlanResource) Create(ctx context.Context, req resource.Cre
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
-	plan.ID = types.StringValue(fmt.Sprintf("network/%s", vlanName))
+	plan.ID = types.StringValue(fmt.Sprintf("network/%s", sectionName))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -117,16 +127,30 @@ func (r *networkBridgeVlanResource) Read(ctx context.Context, req resource.ReadR
 
 	device := state.Device.ValueString()
 	vlan := state.VLAN.ValueInt64()
-	vlanName := fmt.Sprintf("%s_%d", device, vlan)
 
-	data, err := r.client.UCIGetAll(ctx, "network", vlanName)
-	if err != nil || len(data) == 0 {
+	vlans, err := r.client.UCIForeach(ctx, "network", "bridge-vlan")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading bridge VLANs", err.Error())
+		return
+	}
+
+	var data map[string]interface{}
+	for _, v := range vlans {
+		dev, _ := v["device"].(string)
+		vlanNum, _ := v["vlan"].(string)
+		if dev == device && vlanNum == fmt.Sprintf("%d", vlan) {
+			data = v
+			break
+		}
+	}
+
+	if data == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	r.optionsToModel(data, &state)
-	state.ID = types.StringValue(fmt.Sprintf("network/%s", vlanName))
+	state.ID = types.StringValue(fmt.Sprintf("network/%s", data[".name"]))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -172,9 +196,29 @@ func (r *networkBridgeVlanResource) Delete(ctx context.Context, req resource.Del
 
 	device := state.Device.ValueString()
 	vlan := state.VLAN.ValueInt64()
-	vlanName := fmt.Sprintf("%s_%d", device, vlan)
 
-	if err := r.client.UCIDelete(ctx, "network", vlanName); err != nil {
+	vlans, err := r.client.UCIForeach(ctx, "network", "bridge-vlan")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading bridge VLANs", err.Error())
+		return
+	}
+
+	var sectionName string
+	for _, v := range vlans {
+		dev, _ := v["device"].(string)
+		vlanNum, _ := v["vlan"].(string)
+		if dev == device && vlanNum == fmt.Sprintf("%d", vlan) {
+			sectionName, _ = v[".name"].(string)
+			break
+		}
+	}
+
+	if sectionName == "" {
+		resp.Diagnostics.AddError("Error deleting bridge VLAN", "section not found")
+		return
+	}
+
+	if err := r.client.UCIDelete(ctx, "network", sectionName); err != nil {
 		resp.Diagnostics.AddError("Error deleting bridge VLAN", err.Error())
 		return
 	}
