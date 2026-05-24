@@ -1,4 +1,4 @@
-# Terraform Provider for OpenWrt
+# Terraform Provider OpenWrt
 
 The OpenWrt provider manages OpenWrt devices via the LuCI JSON-RPC API.
 
