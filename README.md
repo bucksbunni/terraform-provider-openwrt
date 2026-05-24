@@ -338,6 +338,32 @@ resource "openwrt_dhcp_odhcpd" "main" {
 
 ### Wireless Resources
 
+> **Prerequisite**: Wireless support requires kernel modules and firmware packages to be installed on the router. These vary by hardware chipset (Atheros, Broadcom, MediaTek, Intel, etc.) and must be installed separately using `openwrt_ipkg_package`.
+
+**Typical setup for Atheros hardware:**
+
+```hcl
+# Install kernel module and firmware
+resource "openwrt_ipkg_package" "ath10k_dkmod" {
+  name = "kmod-ath10k"
+}
+
+resource "openwrt_ipkg_package" "ath10k_fw" {
+  name = "ath10k-firmware-qca988x"
+}
+
+# Restart network to load the driver
+resource "openwrt_sys_rpc" "wifi_restart" {
+  method      = "init.restart"
+  params_json = jsonencode(["network"])
+}
+
+# Now configure wireless
+resource "openwrt_wireless_device" "radio0" {
+  # ...
+}
+```
+
 #### openwrt_wireless_device
 
 Manages wireless radio devices:
