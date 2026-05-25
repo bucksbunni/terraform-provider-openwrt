@@ -206,9 +206,7 @@ func (r *sysModprobeResource) executeModprobe(ctx context.Context, name, action 
 
 	tflog.Info(ctx, fmt.Sprintf("Executing: %s", command))
 
-	result, err := r.client.SysCall(ctx, "exec", map[string]interface{}{
-		"command": command,
-	})
+	result, err := r.client.SysCall(ctx, "exec", command)
 	if err != nil {
 		return "", fmt.Errorf("modprobe failed: %w", err)
 	}
@@ -233,9 +231,7 @@ func (r *sysModprobeResource) executeModprobe(ctx context.Context, name, action 
 }
 
 func (r *sysModprobeResource) isModuleLoaded(ctx context.Context, name string) (bool, error) {
-	result, err := r.client.SysCall(ctx, "exec", map[string]interface{}{
-		"command": fmt.Sprintf("lsmod | grep -q ^%s && echo loaded || echo not_loaded", name),
-	})
+	result, err := r.client.SysCall(ctx, "exec", fmt.Sprintf("lsmod | grep -q ^%s && echo loaded || echo not_loaded", name))
 	if err != nil {
 		return false, err
 	}
