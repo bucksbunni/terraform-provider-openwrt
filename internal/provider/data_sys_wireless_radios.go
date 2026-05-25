@@ -24,6 +24,7 @@ type sysWirelessRadioModel struct {
 	Band     types.String `tfsdk:"band"`
 	Channel  types.Int64  `tfsdk:"channel"`
 	HTMode   types.String `tfsdk:"htmode"`
+	HWMode   types.String `tfsdk:"hwmode"`
 	Country  types.String `tfsdk:"country"`
 	TxPower  types.Int64  `tfsdk:"txpower"`
 	Disabled types.Bool   `tfsdk:"disabled"`
@@ -57,6 +58,7 @@ func (d *sysWirelessRadiosDataSource) Schema(_ context.Context, _ datasource.Sch
 						"band":      types.StringType,
 						"channel":   types.Int64Type,
 						"htmode":    types.StringType,
+						"hwmode":    types.StringType,
 						"country":   types.StringType,
 						"txpower":   types.Int64Type,
 						"disabled":  types.BoolType,
@@ -119,6 +121,9 @@ func (d *sysWirelessRadiosDataSource) Read(ctx context.Context, req datasource.R
 		if v, ok := radio["htmode"].(string); ok {
 			r.HTMode = types.StringValue(v)
 		}
+		if v, ok := radio["hwmode"].(string); ok {
+			r.HWMode = types.StringValue(v)
+		}
 		if v, ok := radio["country"].(string); ok {
 			r.Country = types.StringValue(v)
 		}
@@ -142,6 +147,7 @@ func (d *sysWirelessRadiosDataSource) Read(ctx context.Context, req datasource.R
 			"band":     types.StringType,
 			"channel":  types.Int64Type,
 			"htmode":   types.StringType,
+			"hwmode":   types.StringType,
 			"country":  types.StringType,
 			"txpower":  types.Int64Type,
 			"disabled": types.BoolType,

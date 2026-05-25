@@ -168,6 +168,7 @@ Discovers available wireless radio devices from OpenWrt's UCI configuration.
 | `band` | String | Supported band (2g, 5g, 6g) |
 | `channel` | Int64 | Current channel |
 | `htmode` | String | Channel width (HT40, VHT80, etc.) |
+| `hwmode` | String | Hardware mode (11a, 11g, 11n, 11ac, 11ax) |
 | `country` | String | Country code |
 | `txpower` | Int64 | Transmit power |
 | `disabled` | Bool | Whether radio is disabled |
