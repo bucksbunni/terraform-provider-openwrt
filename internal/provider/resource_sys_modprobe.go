@@ -238,7 +238,7 @@ func (r *sysModprobeResource) isModuleLoaded(ctx context.Context, name string) (
 
 	var resultMap map[string]interface{}
 	if err := json.Unmarshal(result, &resultMap); err != nil {
-		return false, err
+		return strings.Contains(string(result), "loaded"), nil
 	}
 
 	if msg, ok := resultMap["msg"].(string); ok {
