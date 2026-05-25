@@ -141,7 +141,6 @@ func TestNetworkInterfaceToOptions_AllFields(t *testing.T) {
 		Proto:       ptrStringP("static"),
 		Device:      ptrStringP("br-lan"),
 		IPAddr:      ptrStringP("192.168.1.1/24"),
-		Netmask:     ptrStringP("255.255.255.0"),
 		Gateway:     ptrStringP("192.168.1.254"),
 		DNS:         ptrStringP("8.8.8.8"),
 		Metric:      ptrInt64P(100),
