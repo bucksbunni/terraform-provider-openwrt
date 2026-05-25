@@ -202,6 +202,8 @@ func (p *openwrtProvider) DataSources(_ context.Context) []func() datasource.Dat
 
 		// Wireless
 		NewSysWirelessDataSource,
+		NewSysWirelessRadiosDataSource,
+		NewSysWirelessIfacesDataSource,
 	}
 }
 

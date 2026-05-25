@@ -20,7 +20,10 @@ All notable changes to the terraform-provider-openwrt will be documented in this
 - Sys wireless info data source (openwrt_sys_wireless_info)
 - Sys reboot resource (openwrt_sys_reboot) - Triggers device reboot with optional delay
 - Sys modprobe resource (openwrt_sys_modprobe) - Loads/unloads kernel modules with optional parameters
+- Sys wireless radios data source (openwrt_sys_wireless_radios) - Discovers available wireless radio devices
+- Sys wireless ifaces data source (openwrt_sys_wireless_ifaces) - Discovers wireless interfaces
 - Supports reading configuration from environment variables
+- ipkg_package resource: Added autoremove, force_remove, and update flags
 
 ### Fixed
 
