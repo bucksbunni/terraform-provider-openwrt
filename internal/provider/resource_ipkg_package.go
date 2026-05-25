@@ -6,7 +6,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -22,8 +23,11 @@ type ipkgPackageResource struct {
 }
 
 type ipkgPackageModel struct {
-	ID   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"name"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	AutoRemove  types.Bool   `tfsdk:"autoremove"`
+	ForceRemove types.Bool   `tfsdk:"force_remove"`
+	Update      types.Bool   `tfsdk:"update"`
 }
 
 func (r *ipkgPackageResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -31,16 +35,34 @@ func (r *ipkgPackageResource) Metadata(_ context.Context, req resource.MetadataR
 }
 
 func (r *ipkgPackageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = rschema.Schema{
+	resp.Schema = schema.Schema{
 		Description: "Manages an OpenWrt package via LuCI /rpc/ipkg.",
-		Attributes: map[string]rschema.Attribute{
-			"id": rschema.StringAttribute{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal ID, equal to package name.",
 			},
-			"name": rschema.StringAttribute{
+			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "Package name as known to opkg, e.g. 'luci-mod-rpc'.",
+			},
+			"autoremove": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+				Description: "Remove packages that were installed automatically to satisfy dependencies.",
+			},
+			"force_remove": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+				Description: "Remove package and all dependencies.",
+			},
+			"update": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+				Description: "Update package lists before installing.",
 			},
 		},
 	}
@@ -71,8 +93,9 @@ func (r *ipkgPackageResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	name := plan.Name.ValueString()
+	update := plan.Update.ValueBool()
 
-	if err := r.client.IPKGInstall(ctx, name); err != nil {
+	if err := r.client.IPKGInstall(ctx, name, update); err != nil {
 		resp.Diagnostics.AddError("Error installing package", err.Error())
 		return
 	}
@@ -102,6 +125,17 @@ func (r *ipkgPackageResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	state.ID = types.StringValue(name)
+
+	if state.AutoRemove.IsNull() {
+		state.AutoRemove = types.BoolValue(true)
+	}
+	if state.ForceRemove.IsNull() {
+		state.ForceRemove = types.BoolValue(true)
+	}
+	if state.Update.IsNull() {
+		state.Update = types.BoolValue(true)
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -118,8 +152,10 @@ func (r *ipkgPackageResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	name := state.Name.ValueString()
+	autoremove := state.AutoRemove.ValueBool()
+	forceRemove := state.ForceRemove.ValueBool()
 
-	if err := r.client.IPKGRemove(ctx, name); err != nil {
+	if err := r.client.IPKGRemove(ctx, name, autoremove, forceRemove); err != nil {
 		resp.Diagnostics.AddError("Error removing package", err.Error())
 		return
 	}

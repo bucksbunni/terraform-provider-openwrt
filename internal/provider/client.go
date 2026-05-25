@@ -337,13 +337,25 @@ func (c *JsonRpcClient) IPKGInstalled(ctx context.Context, pkg string) (bool, er
 	return ok, nil
 }
 
-func (c *JsonRpcClient) IPKGInstall(ctx context.Context, pkg string) error {
+func (c *JsonRpcClient) IPKGInstall(ctx context.Context, pkg string, update bool) error {
+	if update {
+		if err := c.IPKGUpdate(ctx); err != nil {
+			return fmt.Errorf("failed to update package lists: %w", err)
+		}
+	}
 	_, err := c.call(ctx, "ipkg", "install", pkg)
 	return err
 }
 
-func (c *JsonRpcClient) IPKGRemove(ctx context.Context, pkg string) error {
-	_, err := c.call(ctx, "ipkg", "remove", pkg)
+func (c *JsonRpcClient) IPKGRemove(ctx context.Context, pkg string, autoremove, forceRemove bool) error {
+	args := []interface{}{pkg}
+	if autoremove {
+		args = append(args, "--autoremove")
+	}
+	if forceRemove {
+		args = append(args, "--force-removal-of-dependent-packages")
+	}
+	_, err := c.call(ctx, "ipkg", "remove", args...)
 	return err
 }
 
