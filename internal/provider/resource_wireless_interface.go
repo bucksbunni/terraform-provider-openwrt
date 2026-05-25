@@ -24,19 +24,19 @@ type wirelessInterfaceResource struct {
 }
 
 type wirelessInterfaceModel struct {
-	ID         types.String `tfsdk:"id"`
-	Name       types.String `tfsdk:"name"`
-	Device     types.String `tfsdk:"device"`
-	Mode       types.String `tfsdk:"mode"`
-	SSID       types.String `tfsdk:"ssid"`
-	Encryption types.String `tfsdk:"encryption"`
-	Key        types.String `tfsdk:"key"`
-	Network    types.String `tfsdk:"network"`
-	Disabled   types.Bool   `tfsdk:"disabled"`
-	Hidden     types.Bool   `tfsdk:"hidden"`
-	MACFilter  types.String `tfsdk:"macfilter"`
-	MACList    types.String `tfsdk:"maclist"`
-	Isolate    types.Bool   `tfsdk:"isolate"`
+	ID         types.String   `tfsdk:"id"`
+	Name       types.String   `tfsdk:"name"`
+	Device     types.String   `tfsdk:"device"`
+	Mode       types.String   `tfsdk:"mode"`
+	SSID       types.String   `tfsdk:"ssid"`
+	Encryption types.String   `tfsdk:"encryption"`
+	Key        types.String   `tfsdk:"key"`
+	Network    types.List     `tfsdk:"network"`
+	Disabled   types.Bool     `tfsdk:"disabled"`
+	Hidden     types.Bool     `tfsdk:"hidden"`
+	MACFilter  types.String   `tfsdk:"macfilter"`
+	MACList    types.List     `tfsdk:"maclist"`
+	Isolate    types.Bool     `tfsdk:"isolate"`
 }
 
 func (r *wirelessInterfaceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -83,9 +83,10 @@ func (r *wirelessInterfaceResource) Schema(_ context.Context, _ resource.SchemaR
 				Sensitive:   true,
 				Description: "Wireless passphrase/PSK.",
 			},
-			"network": schema.StringAttribute{
+			"network": schema.ListAttribute{
 				Optional:    true,
-				Description: "Network to attach (e.g., 'lan', 'guest').",
+				ElementType: types.StringType,
+				Description: "Networks to attach (e.g., ['lan', 'guest']).",
 			},
 			"disabled": schema.BoolAttribute{
 				Optional:    true,
@@ -99,9 +100,10 @@ func (r *wirelessInterfaceResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				Description: "MAC filter mode: 'disable', 'allow', 'deny'.",
 			},
-			"maclist": schema.StringAttribute{
+			"maclist": schema.ListAttribute{
 				Optional:    true,
-				Description: "MAC address list for filtering, space-separated.",
+				ElementType: types.StringType,
+				Description: "MAC address list for filtering (e.g., ['00:11:22:33:44:55', 'AA:BB:CC:DD:EE:FF']).",
 			},
 			"isolate": schema.BoolAttribute{
 				Optional:    true,
@@ -131,7 +133,7 @@ func (r *wirelessInterfaceResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	secName, err := r.client.UCISection(ctx, "wireless", "wifi-iface", name, options)
 	if err != nil {
@@ -187,7 +189,7 @@ func (r *wirelessInterfaceResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	r.optionsToModel(data, &state)
+	r.optionsToModel(ctx, data, &state)
 	state.ID = types.StringValue(fmt.Sprintf("wireless/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -204,7 +206,7 @@ func (r *wirelessInterfaceResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	if err := r.client.UCITSet(ctx, "wireless", name, options); err != nil {
 		resp.Diagnostics.AddError("Error updating wireless interface", err.Error())
@@ -263,7 +265,7 @@ func (r *wirelessInterfaceResource) ImportState(ctx context.Context, req resourc
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func (r *wirelessInterfaceResource) modelToOptions(plan wirelessInterfaceModel) map[string]interface{} {
+func (r *wirelessInterfaceResource) modelToOptions(ctx context.Context, plan wirelessInterfaceModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Device.IsNull() {
@@ -282,7 +284,9 @@ func (r *wirelessInterfaceResource) modelToOptions(plan wirelessInterfaceModel) 
 		options["key"] = plan.Key.ValueString()
 	}
 	if !plan.Network.IsNull() {
-		options["network"] = plan.Network.ValueString()
+		var networks []string
+		plan.Network.ElementsAs(ctx, &networks, false)
+		options["network"] = strings.Join(networks, " ")
 	}
 	if !plan.Disabled.IsNull() {
 		if plan.Disabled.ValueBool() {
@@ -298,7 +302,9 @@ func (r *wirelessInterfaceResource) modelToOptions(plan wirelessInterfaceModel) 
 		options["macfilter"] = plan.MACFilter.ValueString()
 	}
 	if !plan.MACList.IsNull() {
-		options["maclist"] = plan.MACList.ValueString()
+		var maclist []string
+		plan.MACList.ElementsAs(ctx, &maclist, false)
+		options["maclist"] = strings.Join(maclist, " ")
 	}
 	if !plan.Isolate.IsNull() {
 		if plan.Isolate.ValueBool() {
@@ -309,7 +315,7 @@ func (r *wirelessInterfaceResource) modelToOptions(plan wirelessInterfaceModel) 
 	return options
 }
 
-func (r *wirelessInterfaceResource) optionsToModel(data map[string]interface{}, state *wirelessInterfaceModel) {
+func (r *wirelessInterfaceResource) optionsToModel(ctx context.Context, data map[string]interface{}, state *wirelessInterfaceModel) {
 	if v, ok := data["device"].(string); ok {
 		state.Device = types.StringValue(v)
 	}
@@ -325,8 +331,9 @@ func (r *wirelessInterfaceResource) optionsToModel(data map[string]interface{}, 
 	if v, ok := data["key"].(string); ok {
 		state.Key = types.StringValue(v)
 	}
-	if v, ok := data["network"].(string); ok {
-		state.Network = types.StringValue(v)
+	if v, ok := data["network"].(string); ok && v != "" {
+		networks := strings.Split(v, " ")
+		state.Network, _ = types.ListValueFrom(ctx, types.StringType, networks)
 	}
 	if v, ok := data["disabled"].(string); ok {
 		state.Disabled = types.BoolValue(v == "1" || v == "true")
@@ -337,8 +344,9 @@ func (r *wirelessInterfaceResource) optionsToModel(data map[string]interface{}, 
 	if v, ok := data["macfilter"].(string); ok {
 		state.MACFilter = types.StringValue(v)
 	}
-	if v, ok := data["maclist"].(string); ok {
-		state.MACList = types.StringValue(v)
+	if v, ok := data["maclist"].(string); ok && v != "" {
+		maclist := strings.Split(v, " ")
+		state.MACList, _ = types.ListValueFrom(ctx, types.StringType, maclist)
 	}
 	if v, ok := data["isolate"].(string); ok {
 		state.Isolate = types.BoolValue(v == "1" || v == "true")

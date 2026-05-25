@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -21,8 +22,8 @@ type uhttpdResource struct {
 type uhttpdModel struct {
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
-	ListenHTTP     types.String `tfsdk:"listen_http"`
-	ListenHTTPS    types.String `tfsdk:"listen_https"`
+	ListenHTTP     types.List   `tfsdk:"listen_http"`
+	ListenHTTPS    types.List   `tfsdk:"listen_https"`
 	RedirectHTTPS  types.Bool   `tfsdk:"redirect_https"`
 	Home           types.String `tfsdk:"home"`
 	RFC1918Filter  types.Bool   `tfsdk:"rfc1918_filter"`
@@ -55,13 +56,15 @@ func (r *uhttpdResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Required:    true,
 				Description: "Instance name (e.g., 'main').",
 			},
-			"listen_http": schema.StringAttribute{
+			"listen_http": schema.ListAttribute{
 				Optional:    true,
-				Description: "HTTP listen addresses, space-separated (e.g., '0.0.0.0:80 [::]:80').",
+				ElementType: types.StringType,
+				Description: "HTTP listen addresses (e.g., ['0.0.0.0:80', '[::]:80']).",
 			},
-			"listen_https": schema.StringAttribute{
+			"listen_https": schema.ListAttribute{
 				Optional:    true,
-				Description: "HTTPS listen addresses, space-separated.",
+				ElementType: types.StringType,
+				Description: "HTTPS listen addresses (e.g., ['0.0.0.0:443', '[::]:443']).",
 			},
 			"redirect_https": schema.BoolAttribute{
 				Optional:    true,
@@ -143,7 +146,7 @@ func (r *uhttpdResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	_, err := r.client.UCISection(ctx, "uhttpd", "uhttpd", name, options)
 	if err != nil {
@@ -196,7 +199,7 @@ func (r *uhttpdResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	if err := r.client.UCITSet(ctx, "uhttpd", name, options); err != nil {
 		resp.Diagnostics.AddError("Error updating uhttpd config", err.Error())
@@ -238,14 +241,22 @@ func (r *uhttpdResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	resp.State.RemoveResource(ctx)
 }
 
-func (r *uhttpdResource) modelToOptions(plan uhttpdModel) map[string]interface{} {
+func (r *uhttpdResource) modelToOptions(ctx context.Context, plan uhttpdModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.ListenHTTP.IsNull() {
-		options["listen_http"] = plan.ListenHTTP.ValueString()
+		var httpList []string
+		diagnostics := plan.ListenHTTP.ElementsAs(ctx, &httpList, false)
+		if !diagnostics.HasError() {
+			options["listen_http"] = strings.Join(httpList, " ")
+		}
 	}
 	if !plan.ListenHTTPS.IsNull() {
-		options["listen_https"] = plan.ListenHTTPS.ValueString()
+		var httpsList []string
+		diagnostics := plan.ListenHTTPS.ElementsAs(ctx, &httpsList, false)
+		if !diagnostics.HasError() {
+			options["listen_https"] = strings.Join(httpsList, " ")
+		}
 	}
 	if !plan.RedirectHTTPS.IsNull() {
 		options["redirect_https"] = boolToString(plan.RedirectHTTPS.ValueBool())
@@ -294,11 +305,39 @@ func (r *uhttpdResource) modelToOptions(plan uhttpdModel) map[string]interface{}
 }
 
 func (r *uhttpdResource) optionsToModel(data map[string]interface{}, state *uhttpdModel) {
-	if v, ok := data["listen_http"].(string); ok {
-		state.ListenHTTP = types.StringValue(v)
+	if http, ok := data["listen_http"]; ok {
+		switch v := http.(type) {
+		case []interface{}:
+			var httpList []string
+			for _, h := range v {
+				if s, ok := h.(string); ok {
+					httpList = append(httpList, s)
+				}
+			}
+			state.ListenHTTP, _ = types.ListValueFrom(context.Background(), types.StringType, httpList)
+		case string:
+			if v != "" {
+				httpList := strings.Split(v, " ")
+				state.ListenHTTP, _ = types.ListValueFrom(context.Background(), types.StringType, httpList)
+			}
+		}
 	}
-	if v, ok := data["listen_https"].(string); ok {
-		state.ListenHTTPS = types.StringValue(v)
+	if https, ok := data["listen_https"]; ok {
+		switch v := https.(type) {
+		case []interface{}:
+			var httpsList []string
+			for _, h := range v {
+				if s, ok := h.(string); ok {
+					httpsList = append(httpsList, s)
+				}
+			}
+			state.ListenHTTPS, _ = types.ListValueFrom(context.Background(), types.StringType, httpsList)
+		case string:
+			if v != "" {
+				httpsList := strings.Split(v, " ")
+				state.ListenHTTPS, _ = types.ListValueFrom(context.Background(), types.StringType, httpsList)
+			}
+		}
 	}
 	if v, ok := data["redirect_https"].(string); ok {
 		state.RedirectHTTPS = types.BoolValue(v == "1" || v == "true")

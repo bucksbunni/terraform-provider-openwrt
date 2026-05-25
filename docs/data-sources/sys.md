@@ -205,11 +205,11 @@ Discovers wireless interfaces from OpenWrt's UCI configuration.
 | `mode` | String | Operation mode (ap, sta, adhoc, etc.) |
 | `ssid` | String | Network SSID |
 | `encryption` | String | Encryption mode |
-| `network` | String | Attached network |
+| `network` | List(String) | Attached networks |
 | `disabled` | Bool | Whether interface is disabled |
 | `hidden` | Bool | Whether SSID is hidden |
 | `macfilter` | String | MAC filter mode |
-| `maclist` | String | MAC address list |
+| `maclist` | List(String) | MAC address list |
 | `isolate` | Bool | Client isolation enabled |
 
 ### Example

@@ -19,13 +19,12 @@ Manages a network interface (LAN, WAN, guest, etc.).
 | `name` | String | Yes | Interface name (e.g., 'lan', 'wan', 'guest') |
 | `proto` | String | Yes | Protocol: 'static', 'dhcp', 'dhcpv6', 'pppoe', 'wireguard', 'qmi' |
 | `device` | String | No | Network device (e.g., 'eth0', 'br-lan', 'wg0') |
-| `ipaddr` | String | No | IPv4 address with prefix (e.g., '192.168.1.1/24') |
-| `netmask` | String | No | Netmask for static IP |
+| `ipaddr` | List(String) | No | IPv4 address(es) with prefix (e.g., ['192.168.1.1/24', '10.0.0.1/24']) |
 | `gateway` | String | No | Default gateway |
-| `dns` | String | No | DNS servers (space-separated) |
+| `dns` | List(String) | No | DNS servers (e.g., ['8.8.8.8', '1.1.1.1']) |
 | `metric` | Int64 | No | Interface metric |
 | `delegate` | Bool | No | Delegate IPv6 prefixes |
-| `ip6addr` | String | No | IPv6 address |
+| `ip6addr` | List(String) | No | IPv6 address(es) (e.g., ['fd00::1/64', '2001:db8::1/64']) |
 | `ip6prefix` | String | No | IPv6 prefix |
 | `ip6assign` | String | No | IPv6 assignment prefix |
 | `ip6gateway` | String | No | IPv6 gateway |
@@ -41,10 +40,21 @@ resource "openwrt_network_interface" "lan" {
   name    = "lan"
   proto   = "static"
   device  = "br-lan"
-  ipaddr  = "192.168.1.1/24"
+  ipaddr  = ["192.168.1.1/24"]
   gateway = "192.168.1.254"
-  dns     = "8.8.8.8 8.8.4.4"
+  dns     = ["8.8.8.8", "1.1.1.1"]
   metric  = 100
+  auto    = "1"
+}
+
+# Multi-IP interface
+resource "openwrt_network_interface" "guest" {
+  name    = "guest"
+  proto   = "static"
+  device  = "br-guest"
+  ipaddr  = ["10.10.20.1/24", "10.10.30.1/24"]
+  ip6addr = ["fd00:1::1/64", "fd00:2::1/64"]
+  dns     = ["1.1.1.1"]
   auto    = "1"
 }
 
@@ -72,7 +82,7 @@ Manages network devices (bridges, bonds, VLANs).
 | `name` | String | Yes | Device name (e.g., 'br-lan') |
 | `type` | String | Yes | Device type: 'bridge', 'bonding', 'vlan' |
 | `enabled` | Bool | No | Enable the device |
-| ` Bridge Ports | ports` | String | No | Bridge ports (space-separated) |
+| ` Bridge Ports | ports` | List(String) | No | Bridge ports (e.g., ['eth0', 'eth1']) |
 | ` Bridge Empty | bridge_empty` | Bool | No | Create empty bridge |
 | ` Bonding | policy` | String | No | Bonding policy (e.g., '802.3ad') |
 | ` Bonding | xmit_hash_policy` | String | No | Transmission hash policy |
@@ -86,14 +96,14 @@ Manages network devices (bridges, bonds, VLANs).
 resource "openwrt_network_device" "br_lan" {
   name  = "br-lan"
   type  = "bridge"
-  ports = "eth0 eth1"
+  ports = ["eth0", "eth1"]
 }
 
 # Bonding device
 resource "openwrt_network_device" "bond0" {
   name            = "bond0"
   type            = "bonding"
-  ports           = "eth1 eth2"
+  ports           = ["eth1", "eth2"]
   policy          = "802.3ad"
   xmit_hash_policy = "layer2+3"
 }
@@ -112,7 +122,7 @@ Manages bridge VLAN assignments.
 | `id` | String | Computed | Internal ID |
 | `device` | String | Yes | Bridge device name |
 | `vlan` | Int64 | Yes | VLAN ID |
-| `ports` | String | Yes | Ports with flags (e.g., 'eth0:u* eth1:t') |
+| `ports` | Map(String) | Yes | Ports with flags (e.g., {eth0 = 'u*', eth1 = 't'}) |
 
 ### Example
 
@@ -120,13 +130,19 @@ Manages bridge VLAN assignments.
 resource "openwrt_network_bridge_vlan" "vlan1" {
   device = "br-lan"
   vlan   = 1
-  ports  = "eth0:u* eth1:u*"
+  ports  = {
+    "eth0" = "u*"
+    "eth1" = "u*"
+  }
 }
 
 resource "openwrt_network_bridge_vlan" "vlan10" {
   device = "br-lan"
   vlan   = 10
-  ports  = "eth2:t eth3:t"
+  ports  = {
+    "eth2" = "t"
+    "eth3" = "t"
+  }
 }
 ```
 
@@ -174,7 +190,7 @@ Manages WireGuard VPN peers.
 | `mtu` | Int64 | No | MTU |
 | `endpoint_host` | String | No | Endpoint host |
 | `endpoint_port` | Int64 | No | Endpoint port |
-| `allowed_ips` | String | No | Allowed IPs |
+| `allowed_ips` | List(String) | No | Allowed IPs (e.g., ['10.0.0.2/32', '10.0.0.0/24']) |
 | `persistent_keepalive` | Int64 | No | Keepalive interval (seconds) |
 
 ### Example
@@ -195,7 +211,7 @@ resource "openwrt_network_wireguard" "peer1" {
   endpoint_host         = "vpn.example.com"
   endpoint_port         = 51820
   persistent_keepalive  = 25
-  allowed_ips           = "10.0.0.2/32 10.0.0.0/24"
+  allowed_ips           = ["10.0.0.2/32", "10.0.0.0/24"]
 }
 ```
 

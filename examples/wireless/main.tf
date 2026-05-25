@@ -51,7 +51,7 @@ resource "openwrt_wireless_iface" "home_2g" {
   ssid        = "HomeNet-2.4GHz"
   encryption  = "psk2+ccmp"
   key         = "your_wpa2_password"
-  network     = "lan"
+  network     = ["lan"]
   hidden      = false
   isolate     = false
 }
@@ -63,7 +63,7 @@ resource "openwrt_wireless_iface" "home_5g" {
   ssid        = "HomeNet-5GHz"
   encryption  = "psk2+ccmp"
   key         = "your_wpa2_password"
-  network     = "lan"
+  network     = ["lan"]
   hidden      = false
   isolate     = false
 }
@@ -75,7 +75,7 @@ resource "openwrt_wireless_iface" "home_6g" {
   ssid        = "HomeNet-6GHz"
   encryption  = "sae"
   key         = "your_wpa3_password"
-  network     = "lan"
+  network     = ["lan"]
   hidden      = false
   isolate     = false
 }
@@ -87,7 +87,7 @@ resource "openwrt_wireless_iface" "guest_2g" {
   ssid        = "GuestNet"
   encryption  = "psk2"
   key         = "guest_password_2024"
-  network     = "guest"
+  network     = ["guest"]
   hidden      = false
   isolate     = true
 }
@@ -99,7 +99,7 @@ resource "openwrt_wireless_iface" "guest_5g" {
   ssid        = "GuestNet-5GHz"
   encryption  = "psk2"
   key         = "guest_password_2024"
-  network     = "guest"
+  network     = ["guest"]
   hidden      = false
   isolate     = true
 }
@@ -111,11 +111,11 @@ resource "openwrt_wireless_iface" "iot_2g" {
   ssid        = "IoT-Network"
   encryption  = "psk2"
   key         = "iot_secure_pass"
-  network     = "iot"
+  network     = ["iot"]
   hidden      = false
   isolate     = true
   macfilter   = "allow"
-  maclist     = "AA:BB:CC:DD:EE:01 AA:BB:CC:DD:EE:02 AA:BB:CC:DD:EE:03"
+  maclist     = ["AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:03"]
 }
 
 resource "openwrt_wireless_iface" "staff_5g" {
@@ -125,11 +125,11 @@ resource "openwrt_wireless_iface" "staff_5g" {
   ssid        = "Staff-Network"
   encryption  = "psk2+ccmp"
   key         = "staff_password_2024"
-  network     = "staff"
+  network     = ["staff"]
   hidden      = false
   isolate     = false
   macfilter   = "allow"
-  maclist     = "11:22:33:44:55:66 77:88:99:AA:BB:CC"
+  maclist     = ["11:22:33:44:55:66", "77:88:99:AA:BB:CC"]
 }
 
 output "radio0_id" {

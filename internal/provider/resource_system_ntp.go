@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -22,7 +23,7 @@ type systemNTPModel struct {
 	ID      types.String `tfsdk:"id"`
 	Name    types.String `tfsdk:"name"`
 	Enabled types.Bool   `tfsdk:"enabled"`
-	Server  types.String `tfsdk:"server"`
+	Server  types.List   `tfsdk:"server"`
 	Port    types.Int64  `tfsdk:"port"`
 }
 
@@ -46,9 +47,10 @@ func (r *systemNTPResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:    true,
 				Description: "Enable NTP client.",
 			},
-			"server": schema.StringAttribute{
+			"server": schema.ListAttribute{
 				Optional:    true,
-				Description: "NTP server(s), space-separated (e.g., '0.openwrt.pool.ntp.org 1.openwrt.pool.ntp.org').",
+				ElementType: types.StringType,
+				Description: "NTP servers (e.g., ['0.openwrt.pool.ntp.org', '1.openwrt.pool.ntp.org']).",
 			},
 			"port": schema.Int64Attribute{
 				Optional:    true,
@@ -78,7 +80,7 @@ func (r *systemNTPResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	_, err := r.client.UCISection(ctx, "system", "timeserver", name, options)
 	if err != nil {
@@ -131,7 +133,7 @@ func (r *systemNTPResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	if err := r.client.UCITSet(ctx, "system", name, options); err != nil {
 		resp.Diagnostics.AddError("Error updating NTP config", err.Error())
@@ -173,14 +175,18 @@ func (r *systemNTPResource) Delete(ctx context.Context, req resource.DeleteReque
 	resp.State.RemoveResource(ctx)
 }
 
-func (r *systemNTPResource) modelToOptions(plan systemNTPModel) map[string]interface{} {
+func (r *systemNTPResource) modelToOptions(ctx context.Context, plan systemNTPModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Enabled.IsNull() {
 		options["enabled"] = boolToString(plan.Enabled.ValueBool())
 	}
 	if !plan.Server.IsNull() {
-		options["server"] = plan.Server.ValueString()
+		var serverList []string
+		diagnostics := plan.Server.ElementsAs(ctx, &serverList, false)
+		if !diagnostics.HasError() {
+			options["server"] = strings.Join(serverList, " ")
+		}
 	}
 	if !plan.Port.IsNull() {
 		options["port"] = plan.Port.ValueInt64()
@@ -193,8 +199,22 @@ func (r *systemNTPResource) optionsToModel(data map[string]interface{}, state *s
 	if v, ok := data["enabled"].(string); ok {
 		state.Enabled = types.BoolValue(v == "1" || v == "true")
 	}
-	if v, ok := data["server"].(string); ok {
-		state.Server = types.StringValue(v)
+	if server, ok := data["server"]; ok {
+		switch v := server.(type) {
+		case []interface{}:
+			var serverList []string
+			for _, s := range v {
+				if str, ok := s.(string); ok {
+					serverList = append(serverList, str)
+				}
+			}
+			state.Server, _ = types.ListValueFrom(context.Background(), types.StringType, serverList)
+		case string:
+			if v != "" {
+				serverList := strings.Split(v, " ")
+				state.Server, _ = types.ListValueFrom(context.Background(), types.StringType, serverList)
+			}
+		}
 	}
 	if v, ok := data["port"]; ok {
 		if f, ok := v.(float64); ok {

@@ -22,7 +22,7 @@ Manages firewall zones.
 | `forward` | String | No | Forward policy: 'ACCEPT', 'REJECT', 'DROP' |
 | `masq` | Bool | No | Enable SNAT masquerading |
 | `masq6` | Bool | No | Enable IPv6 masquerading |
-| `network` | String | No | Networks assigned to zone |
+| `network` | List(String) | No | Networks assigned to zone (e.g., ['lan', 'guest']) |
 
 ### Example
 
@@ -33,7 +33,7 @@ resource "openwrt_firewall_zone" "lan" {
   output   = "ACCEPT"
   forward  = "REJECT"
   masq     = false
-  network  = "lan"
+  network  = ["lan"]
 }
 
 resource "openwrt_firewall_zone" "guest" {
@@ -42,7 +42,7 @@ resource "openwrt_firewall_zone" "guest" {
   output   = "ACCEPT"
   forward  = "REJECT"
   masq     = true
-  network  = "guest"
+  network  = ["guest", "iot"]
 }
 ```
 
@@ -67,7 +67,7 @@ Manages firewall rules.
 | `dest_ip` | String | No | Destination IP/CIDR |
 | `target` | String | Yes | Target: 'ACCEPT', 'REJECT', 'DROP' |
 | `family` | String | No | IP family: 'ipv4', 'ipv6', 'all' |
-| `icmp_type` | String | No | ICMP type |
+| `icmp_type` | List(String) | No | ICMP type (e.g., ['echo-request', 'echo-reply']) |
 | `limit` | String | No | Rate limit (e.g., '10/minute') |
 | `extra` | String | No | Extra iptables options |
 | `enabled` | Bool | No | Enable the rule |
@@ -90,7 +90,7 @@ resource "openwrt_firewall_rule" "allow_http" {
   name        = "Allow-HTTP"
   src         = "wan"
   dest        = "lan"
-  dest_port   = "80 443"
+  dest_port   = "80"
   proto       = "tcp"
   target      = "ACCEPT"
   src_ip      = "192.168.1.0/24"

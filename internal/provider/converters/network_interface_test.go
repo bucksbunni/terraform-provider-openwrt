@@ -34,12 +34,6 @@ func TestNetworkInterfaceToOptions(t *testing.T) {
 			wantVal: "192.168.1.1/24",
 		},
 		{
-			name:    "netmask",
-			input:   NetworkInterfaceOptions{Netmask: ptrStringP("255.255.255.0")},
-			wantKey: "netmask",
-			wantVal: "255.255.255.0",
-		},
-		{
 			name:    "gateway",
 			input:   NetworkInterfaceOptions{Gateway: ptrStringP("192.168.1.254")},
 			wantKey: "gateway",
@@ -147,7 +141,6 @@ func TestNetworkInterfaceToOptions_AllFields(t *testing.T) {
 		Proto:       ptrStringP("static"),
 		Device:      ptrStringP("br-lan"),
 		IPAddr:      ptrStringP("192.168.1.1/24"),
-		Netmask:     ptrStringP("255.255.255.0"),
 		Gateway:     ptrStringP("192.168.1.254"),
 		DNS:         ptrStringP("8.8.8.8"),
 		Metric:      ptrInt64P(100),
@@ -193,13 +186,6 @@ func TestOptionsToNetworkInterface(t *testing.T) {
 			data:       map[string]interface{}{"ipaddr": "192.168.1.1/24"},
 			checkField: "IPAddr",
 			wantVal:    "192.168.1.1/24",
-			wantNull:   false,
-		},
-		{
-			name:       "netmask",
-			data:       map[string]interface{}{"netmask": "255.255.255.0"},
-			checkField: "Netmask",
-			wantVal:    "255.255.255.0",
 			wantNull:   false,
 		},
 		{

@@ -18,7 +18,7 @@ func TestNetworkInterfaceResource_Schema(t *testing.T) {
 		t.Fatalf("expected correct description, got %q", s.Description)
 	}
 
-	expectedAttrs := []string{"id", "name", "proto", "device", "ipaddr", "netmask", "gateway", "dns", "metric", "delegate", "ip6addr", "ip6prefix", "ip6assign", "ip6gateway", "auto", "type", "bridge_empty"}
+	expectedAttrs := []string{"id", "name", "proto", "device", "ipaddr", "gateway", "dns", "metric", "delegate", "ip6addr", "ip6prefix", "ip6assign", "ip6gateway", "auto", "type", "bridge_empty"}
 	for _, attr := range expectedAttrs {
 		if _, ok := s.Attributes[attr]; !ok {
 			t.Fatalf("expected %s attribute", attr)

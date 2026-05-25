@@ -24,7 +24,7 @@ Manages DHCP pools for network interfaces.
 | `dhcpv4` | String | No | DHCPv4 mode: 'server', 'relay', 'none' |
 | `dhcpv6` | String | No | DHCPv6 mode: 'server', 'relay', 'none' |
 | `ra` | String | No | Router advertisement: 'server', 'relay', 'none' |
-| `ra_flags` | String | No | RA flags |
+| `ra_flags` | List(String) | No | RA flags (e.g., ['managed-config', 'other-config']) |
 
 ### Example
 
@@ -37,7 +37,7 @@ resource "openwrt_dhcp_pool" "lan" {
   leasetime = "12h"
   dhcpv4    = "server"
   ra        = "server"
-  ra_flags  = "managed-config other-config"
+  ra_flags  = ["managed-config", "other-config"]
 }
 ```
 
@@ -65,7 +65,7 @@ Manages DNS/DHCP server (dnsmasq) settings.
 | `resolvfile` | String | No | DNS resolvers file |
 | `localservice` | Bool | No | Only local subnets |
 | `ednspacket_max` | Int64 | No | EDNS packet max size |
-| `server` | String | No | Upstream DNS servers |
+| `server` | List(String) | No | Upstream DNS servers (e.g., ['8.8.8.8', '8.8.4.4']) |
 | `noresolv` | Bool | No | Don't use resolvers |
 | `strictorder` | Bool | No | Query in order |
 
@@ -86,7 +86,7 @@ resource "openwrt_dhcp_dnsmasq" "main" {
   resolvfile       = "/tmp/resolv.conf.d/resolv.conf.auto"
   localservice     = true
   ednspacket_max   = 1232
-  server           = "8.8.8.8 8.8.4.4"
+  server           = ["8.8.8.8", "8.8.4.4"]
 }
 ```
 
@@ -103,7 +103,7 @@ Manages static DHCP host reservations.
 | `id` | String | Computed | Internal ID |
 | `name` | String | Yes | Host name |
 | `ip` | String | Yes | Reserved IP address |
-| `mac` | String | Yes | MAC address |
+| `mac` | List(String) | Yes | MAC addresses (e.g., ['00:11:22:33:44:55']) |
 | `leasetime` | String | No | Lease time override |
 | `dns` | Bool | No | Add to DNS |
 | `cloudflare` | Bool | No | Cloudflare DNS update |
@@ -115,14 +115,15 @@ Manages static DHCP host reservations.
 resource "openwrt_dhcp_host" "server" {
   name      = "fileserver"
   ip        = "192.168.1.100"
-  mac       = "00:11:22:33:44:55"
+  mac       = ["00:11:22:33:44:55"]
   leasetime = "infinite"
 }
 
+# Multiple MAC addresses for same IP
 resource "openwrt_dhcp_host" "printer" {
   name = "printer"
   ip   = "192.168.1.150"
-  mac  = "AA:BB:CC:DD:EE:FF"
+  mac  = ["AA:BB:CC:DD:EE:FF", "00:11:22:33:44:55"]
 }
 ```
 

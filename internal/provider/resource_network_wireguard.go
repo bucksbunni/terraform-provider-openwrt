@@ -30,7 +30,7 @@ type networkWireguardModel struct {
 	EndpointHost        types.String `tfsdk:"endpoint_host"`
 	EndpointPort        types.Int64  `tfsdk:"endpoint_port"`
 	PersistentKeepalive types.Int64  `tfsdk:"persistent_keepalive"`
-	AllowedIPs          types.String `tfsdk:"allowed_ips"`
+	AllowedIPs          types.List   `tfsdk:"allowed_ips"`
 }
 
 func (r *networkWireguardResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -72,9 +72,10 @@ func (r *networkWireguardResource) Schema(_ context.Context, _ resource.SchemaRe
 				Optional:    true,
 				Description: "Persistent keepalive interval in seconds (0 to disable).",
 			},
-			"allowed_ips": schema.StringAttribute{
+			"allowed_ips": schema.ListAttribute{
 				Required:    true,
-				Description: "Allowed IPs for this peer, space-separated (e.g., '10.0.0.2/32').",
+				ElementType: types.StringType,
+				Description: "Allowed IPs for this peer (e.g., ['10.0.0.2/32', '192.168.100.0/24']).",
 			},
 		},
 	}
@@ -100,7 +101,7 @@ func (r *networkWireguardResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	peerType := fmt.Sprintf("wireguard_%s", extractInterfaceName(name))
 
@@ -155,7 +156,7 @@ func (r *networkWireguardResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	if err := r.client.UCITSet(ctx, "network", name, options); err != nil {
 		resp.Diagnostics.AddError("Error updating WireGuard peer", err.Error())
@@ -209,7 +210,7 @@ func (r *networkWireguardResource) ImportState(ctx context.Context, req resource
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func (r *networkWireguardResource) modelToOptions(plan networkWireguardModel) map[string]interface{} {
+func (r *networkWireguardResource) modelToOptions(ctx context.Context, plan networkWireguardModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Description.IsNull() {
@@ -228,7 +229,11 @@ func (r *networkWireguardResource) modelToOptions(plan networkWireguardModel) ma
 		options["persistent_keepalive"] = plan.PersistentKeepalive.ValueInt64()
 	}
 	if !plan.AllowedIPs.IsNull() {
-		options["allowed_ips"] = plan.AllowedIPs.ValueString()
+		var ipsList []string
+		diagnostics := plan.AllowedIPs.ElementsAs(ctx, &ipsList, false)
+		if !diagnostics.HasError() {
+			options["allowed_ips"] = strings.Join(ipsList, " ")
+		}
 	}
 
 	return options
@@ -254,8 +259,22 @@ func (r *networkWireguardResource) optionsToModel(data map[string]interface{}, s
 			state.PersistentKeepalive = types.Int64Value(int64(f))
 		}
 	}
-	if v, ok := data["allowed_ips"].(string); ok {
-		state.AllowedIPs = types.StringValue(v)
+	if ips, ok := data["allowed_ips"]; ok {
+		switch v := ips.(type) {
+		case []interface{}:
+			var ipsList []string
+			for _, ip := range v {
+				if s, ok := ip.(string); ok {
+					ipsList = append(ipsList, s)
+				}
+			}
+			state.AllowedIPs, _ = types.ListValueFrom(context.Background(), types.StringType, ipsList)
+		case string:
+			if v != "" {
+				ipsList := strings.Split(v, " ")
+				state.AllowedIPs, _ = types.ListValueFrom(context.Background(), types.StringType, ipsList)
+			}
+		}
 	}
 }
 

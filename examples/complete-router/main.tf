@@ -22,28 +22,28 @@ resource "openwrt_network_globals" "main" {
 resource "openwrt_network_device" "br_lan" {
   name  = "br-lan"
   type  = "bridge"
-  ports = "eth0 eth1"
+  ports = ["eth0", "eth1"]
 }
 
 resource "openwrt_network_device" "br_guest" {
   name  = "br-guest"
   type  = "bridge"
-  ports = "eth2"
+  ports = ["eth2"]
 }
 
 resource "openwrt_network_interface" "loopback" {
   name    = "loopback"
   proto   = "static"
   device  = "lo"
-  ipaddr  = "127.0.0.1"
-  netmask = "255.0.0.0"
+  ipaddr  = ["127.0.0.1/8"]
 }
 
 resource "openwrt_network_interface" "lan" {
   name    = "lan"
   proto   = "static"
   device  = "br-lan"
-  ipaddr  = "192.168.1.1/24"
+  ipaddr  = ["192.168.1.1/24"]
+  ip6addr = ["fd00:lan::1/64"]
   metric  = 100
   auto    = "1"
 }
@@ -59,14 +59,17 @@ resource "openwrt_network_interface" "guest" {
   name    = "guest"
   proto   = "static"
   device  = "br-guest"
-  ipaddr  = "10.10.10.1/24"
+  ipaddr  = ["10.10.10.1/24"]
+  ip6addr = ["fd00:guest::1/64"]
   auto    = "1"
 }
 
 resource "openwrt_network_bridge_vlan" "guest_vlan10" {
   device = "br-guest"
   vlan   = 10
-  ports  = "eth2:t"
+  ports  = {
+    "eth2" = "t"
+  }
 }
 
 resource "openwrt_firewall_defaults" "main" {
@@ -85,7 +88,7 @@ resource "openwrt_firewall_zone" "lan" {
   output  = "ACCEPT"
   forward = "REJECT"
   masq    = false
-  network = "lan"
+  network = ["lan"]
 }
 
 resource "openwrt_firewall_zone" "wan" {
@@ -95,7 +98,7 @@ resource "openwrt_firewall_zone" "wan" {
   forward = "REJECT"
   masq    = true
   mtu_fix = true
-  network = "wan"
+  network = ["wan"]
 }
 
 resource "openwrt_firewall_zone" "guest" {
@@ -104,7 +107,7 @@ resource "openwrt_firewall_zone" "guest" {
   output  = "ACCEPT"
   forward = "REJECT"
   masq    = true
-  network = "guest"
+  network = ["guest"]
 }
 
 resource "openwrt_firewall_forwarding" "lan_to_wan" {
@@ -163,7 +166,7 @@ resource "openwrt_firewall_rule" "allow_ping_wan" {
   name      = "Allow-Ping-WAN"
   src       = "wan"
   proto     = "icmp"
-  icmp_type = "echo-request"
+  icmp_type = ["echo-request"]
   target    = "ACCEPT"
   family    = "ipv4"
 }
@@ -218,7 +221,7 @@ resource "openwrt_firewall_rule" "allow_icmpv6_wan" {
   proto      = "icmp"
   target     = "ACCEPT"
   family     = "ipv6"
-  icmp_type  = "echo-request echo-reply destination-unreachable packet-too-big time-exceeded"
+  icmp_type  = ["echo-request", "echo-reply", "destination-unreachable", "packet-too-big", "time-exceeded"]
 }
 
 resource "openwrt_dhcp_dnsmasq" "main" {
@@ -254,7 +257,7 @@ resource "openwrt_dhcp_pool" "lan" {
   dhcpv4     = "server"
   ra         = "server"
   dhcpv6     = "server"
-  ra_flags   = "managed-config other-config"
+  ra_flags   = ["managed-config", "other-config"]
 }
 
 resource "openwrt_dhcp_pool" "guest" {
@@ -306,7 +309,7 @@ resource "openwrt_wireless_iface" "home_2g" {
   ssid        = "HomeNet"
   encryption  = "psk2+ccmp"
   key         = "your_wpa2_password"
-  network     = "lan"
+  network     = ["lan"]
   hidden      = false
   isolate     = false
 }
@@ -318,7 +321,7 @@ resource "openwrt_wireless_iface" "home_5g" {
   ssid        = "HomeNet-5GHz"
   encryption  = "psk2+ccmp"
   key         = "your_wpa2_password"
-  network     = "lan"
+  network     = ["lan"]
   hidden      = false
   isolate     = false
 }
@@ -330,7 +333,7 @@ resource "openwrt_wireless_iface" "guest_2g" {
   ssid        = "GuestNet"
   encryption  = "psk2"
   key         = "guest_password"
-  network     = "guest"
+  network     = ["guest"]
   hidden      = false
   isolate     = true
 }
@@ -342,7 +345,7 @@ resource "openwrt_wireless_iface" "guest_5g" {
   ssid        = "GuestNet-5GHz"
   encryption  = "psk2"
   key         = "guest_password"
-  network     = "guest"
+  network     = ["guest"]
   hidden      = false
   isolate     = true
 }

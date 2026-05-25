@@ -51,8 +51,7 @@ func TestAccNetworkInterface_Update(t *testing.T) {
 				Config: testAccNetworkInterfaceConfigUpdate("tf-acc-lan"),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf-acc-lan"),
-					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ipaddr", "192.168.100.1"),
-					resource.TestCheckResourceAttr("openwrt_network_interface.test", "netmask", "255.255.255.0"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ipaddr.0", "192.168.100.1/24"),
 				),
 			},
 		},
@@ -163,8 +162,7 @@ func testAccNetworkInterfaceConfigUpdate(name string) string {
 resource "openwrt_network_interface" "test" {
   name    = "` + name + `"
   proto   = "static"
-  ipaddr  = "192.168.100.1"
-  netmask = "255.255.255.0"
+  ipaddr  = ["192.168.100.1/24"]
 }
 `
 }

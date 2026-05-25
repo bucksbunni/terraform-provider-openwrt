@@ -35,7 +35,7 @@ type firewallRuleModel struct {
 	DestIP   types.String `tfsdk:"dest_ip"`
 	Target   types.String `tfsdk:"target"`
 	Family   types.String `tfsdk:"family"`
-	ICMPType types.String `tfsdk:"icmp_type"`
+	ICMPType types.List   `tfsdk:"icmp_type"`
 	Limit    types.String `tfsdk:"limit"`
 	Extra    types.String `tfsdk:"extra"`
 	Enabled  types.Bool   `tfsdk:"enabled"`
@@ -98,9 +98,10 @@ func (r *firewallRuleResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Description: "IP family: 'ipv4', 'ipv6', or 'all'.",
 			},
-			"icmp_type": schema.StringAttribute{
+			"icmp_type": schema.ListAttribute{
 				Optional:    true,
-				Description: "ICMP type (e.g., 'echo-request', 'echo-reply', space-separated for multiple).",
+				ElementType: types.StringType,
+				Description: "ICMP type (e.g., ['echo-request', 'echo-reply']).",
 			},
 			"limit": schema.StringAttribute{
 				Optional:    true,
@@ -139,7 +140,7 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	secName, err := r.client.UCISection(ctx, "firewall", "rule", name, options)
 	if err != nil {
@@ -196,7 +197,7 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	if err := r.client.UCITSet(ctx, "firewall", name, options); err != nil {
 		resp.Diagnostics.AddError("Error updating firewall rule", err.Error())
@@ -250,7 +251,7 @@ func (r *firewallRuleResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func (r *firewallRuleResource) modelToOptions(plan firewallRuleModel) map[string]interface{} {
+func (r *firewallRuleResource) modelToOptions(ctx context.Context, plan firewallRuleModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Src.IsNull() {
@@ -281,7 +282,11 @@ func (r *firewallRuleResource) modelToOptions(plan firewallRuleModel) map[string
 		options["family"] = plan.Family.ValueString()
 	}
 	if !plan.ICMPType.IsNull() {
-		options["icmp_type"] = plan.ICMPType.ValueString()
+		var icmpList []string
+		diagnostics := plan.ICMPType.ElementsAs(ctx, &icmpList, false)
+		if !diagnostics.HasError() {
+			options["icmp_type"] = strings.Join(icmpList, " ")
+		}
 	}
 	if !plan.Limit.IsNull() {
 		options["limit"] = plan.Limit.ValueString()
@@ -331,8 +336,22 @@ func (r *firewallRuleResource) optionsToModel(data map[string]interface{}, state
 	if v, ok := data["family"].(string); ok {
 		state.Family = types.StringValue(v)
 	}
-	if v, ok := data["icmp_type"].(string); ok {
-		state.ICMPType = types.StringValue(v)
+	if icmp, ok := data["icmp_type"]; ok {
+		switch v := icmp.(type) {
+		case []interface{}:
+			var icmpList []string
+			for _, i := range v {
+				if s, ok := i.(string); ok {
+					icmpList = append(icmpList, s)
+				}
+			}
+			state.ICMPType, _ = types.ListValueFrom(context.Background(), types.StringType, icmpList)
+		case string:
+			if v != "" {
+				icmpList := strings.Split(v, " ")
+				state.ICMPType, _ = types.ListValueFrom(context.Background(), types.StringType, icmpList)
+			}
+		}
 	}
 	if v, ok := data["limit"].(string); ok {
 		state.Limit = types.StringValue(v)

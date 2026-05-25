@@ -6,7 +6,6 @@ type NetworkInterfaceOptions struct {
 	Proto       *string
 	Device      *string
 	IPAddr      *string
-	Netmask     *string
 	Gateway     *string
 	DNS         *string
 	Metric      *int64
@@ -33,9 +32,6 @@ func NetworkInterfaceToOptions(m NetworkInterfaceOptions) map[string]interface{}
 	}
 	if m.IPAddr != nil {
 		options["ipaddr"] = *m.IPAddr
-	}
-	if m.Netmask != nil {
-		options["netmask"] = *m.Netmask
 	}
 	if m.Gateway != nil {
 		options["gateway"] = *m.Gateway
@@ -86,9 +82,6 @@ func OptionsToNetworkInterface(data map[string]interface{}) NetworkInterfaceOpti
 	}
 	if v, ok := data["ipaddr"].(string); ok {
 		m.IPAddr = &v
-	}
-	if v, ok := data["netmask"].(string); ok {
-		m.Netmask = &v
 	}
 	if v, ok := data["gateway"].(string); ok {
 		m.Gateway = &v

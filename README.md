@@ -64,7 +64,7 @@ resource "openwrt_network_interface" "lan" {
   name    = "lan"
   proto   = "static"
   device  = "br-lan"
-  ipaddr  = "192.168.1.1/24"
+  ipaddr  = ["192.168.1.1/24"]
 }
 ```
 

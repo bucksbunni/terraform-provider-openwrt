@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -18,17 +19,17 @@ type sysWirelessIfacesDataSource struct {
 }
 
 type sysWirelessIfaceModel struct {
-	Name       types.String `tfsdk:"name"`
-	Device     types.String `tfsdk:"device"`
-	Mode       types.String `tfsdk:"mode"`
-	SSID       types.String `tfsdk:"ssid"`
-	Encryption types.String `tfsdk:"encryption"`
-	Network    types.String `tfsdk:"network"`
-	Disabled   types.Bool   `tfsdk:"disabled"`
-	Hidden     types.Bool   `tfsdk:"hidden"`
-	MACFilter  types.String `tfsdk:"macfilter"`
-	MACList    types.String `tfsdk:"maclist"`
-	Isolate    types.Bool   `tfsdk:"isolate"`
+	Name       types.String   `tfsdk:"name"`
+	Device     types.String   `tfsdk:"device"`
+	Mode       types.String   `tfsdk:"mode"`
+	SSID       types.String   `tfsdk:"ssid"`
+	Encryption types.String   `tfsdk:"encryption"`
+	Network    types.List     `tfsdk:"network"`
+	Disabled   types.Bool     `tfsdk:"disabled"`
+	Hidden     types.Bool     `tfsdk:"hidden"`
+	MACFilter  types.String   `tfsdk:"macfilter"`
+	MACList    types.List     `tfsdk:"maclist"`
+	Isolate    types.Bool     `tfsdk:"isolate"`
 }
 
 type sysWirelessIfacesModel struct {
@@ -58,11 +59,11 @@ func (d *sysWirelessIfacesDataSource) Schema(_ context.Context, _ datasource.Sch
 						"mode":       types.StringType,
 						"ssid":       types.StringType,
 						"encryption": types.StringType,
-						"network":    types.StringType,
+						"network":    types.ListType{ElemType: types.StringType},
 						"disabled":   types.BoolType,
 						"hidden":     types.BoolType,
 						"macfilter":  types.StringType,
-						"maclist":    types.StringType,
+						"maclist":    types.ListType{ElemType: types.StringType},
 						"isolate":    types.BoolType,
 					},
 				},
@@ -118,8 +119,9 @@ func (d *sysWirelessIfacesDataSource) Read(ctx context.Context, req datasource.R
 		if v, ok := iface["encryption"].(string); ok {
 			i.Encryption = types.StringValue(v)
 		}
-		if v, ok := iface["network"].(string); ok {
-			i.Network = types.StringValue(v)
+		if v, ok := iface["network"].(string); ok && v != "" {
+			networks := strings.Split(v, " ")
+			i.Network, _ = types.ListValueFrom(ctx, types.StringType, networks)
 		}
 		if v, ok := iface["disabled"].(string); ok {
 			i.Disabled = types.BoolValue(v == "1" || v == "true")
@@ -130,8 +132,9 @@ func (d *sysWirelessIfacesDataSource) Read(ctx context.Context, req datasource.R
 		if v, ok := iface["macfilter"].(string); ok {
 			i.MACFilter = types.StringValue(v)
 		}
-		if v, ok := iface["maclist"].(string); ok {
-			i.MACList = types.StringValue(v)
+		if v, ok := iface["maclist"].(string); ok && v != "" {
+			maclist := strings.Split(v, " ")
+			i.MACList, _ = types.ListValueFrom(ctx, types.StringType, maclist)
 		}
 		if v, ok := iface["isolate"].(string); ok {
 			i.Isolate = types.BoolValue(v == "1" || v == "true")
@@ -147,11 +150,11 @@ func (d *sysWirelessIfacesDataSource) Read(ctx context.Context, req datasource.R
 			"mode":       types.StringType,
 			"ssid":       types.StringType,
 			"encryption": types.StringType,
-			"network":    types.StringType,
+			"network":    types.ListType{ElemType: types.StringType},
 			"disabled":   types.BoolType,
 			"hidden":     types.BoolType,
 			"macfilter":  types.StringType,
-			"maclist":    types.StringType,
+			"maclist":    types.ListType{ElemType: types.StringType},
 			"isolate":    types.BoolType,
 		},
 	}, ifaceList)

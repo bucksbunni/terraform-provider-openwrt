@@ -24,10 +24,10 @@ type networkBridgeVlanResource struct {
 }
 
 type networkBridgeVlanModel struct {
-	ID     types.String `tfsdk:"id"`
-	Device types.String `tfsdk:"device"`
-	VLAN   types.Int64  `tfsdk:"vlan"`
-	Ports  types.String `tfsdk:"ports"`
+	ID     types.String   `tfsdk:"id"`
+	Device types.String   `tfsdk:"device"`
+	VLAN   types.Int64    `tfsdk:"vlan"`
+	Ports  types.Map     `tfsdk:"ports"`
 }
 
 func (r *networkBridgeVlanResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -56,9 +56,10 @@ func (r *networkBridgeVlanResource) Schema(_ context.Context, _ resource.SchemaR
 					int64planmodifier.RequiresReplace(),
 				},
 			},
-			"ports": schema.StringAttribute{
+			"ports": schema.MapAttribute{
 				Required:    true,
-				Description: "Ports for this VLAN, space-separated (e.g., 'eth0:u* eth1:t').",
+				ElementType: types.StringType,
+				Description: "Ports for this VLAN (e.g., {eth0 = 'u*', eth1 = 't'}).",
 			},
 		},
 	}
@@ -100,9 +101,20 @@ func (r *networkBridgeVlanResource) Create(ctx context.Context, req resource.Cre
 		resp.Diagnostics.AddError("Error setting bridge VLAN id", err.Error())
 		return
 	}
-	if err := r.client.UCISet(ctx, "network", sectionName, "ports", plan.Ports.ValueString()); err != nil {
-		resp.Diagnostics.AddError("Error setting bridge VLAN ports", err.Error())
-		return
+	if !plan.Ports.IsNull() {
+		var portsMap map[string]string
+		resp.Diagnostics.Append(plan.Ports.ElementsAs(ctx, &portsMap, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		var portsList []string
+		for iface, flags := range portsMap {
+			portsList = append(portsList, iface+":"+flags)
+		}
+		if err := r.client.UCISet(ctx, "network", sectionName, "ports", strings.Join(portsList, " ")); err != nil {
+			resp.Diagnostics.AddError("Error setting bridge VLAN ports", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "network"); err != nil {
@@ -169,7 +181,7 @@ func (r *networkBridgeVlanResource) Update(ctx context.Context, req resource.Upd
 	vlan := plan.VLAN.ValueInt64()
 	vlanName := fmt.Sprintf("%s_%d", device, vlan)
 
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	if err := r.client.UCITSet(ctx, "network", vlanName, options); err != nil {
 		resp.Diagnostics.AddError("Error updating bridge VLAN", err.Error())
@@ -252,7 +264,7 @@ func (r *networkBridgeVlanResource) ImportState(ctx context.Context, req resourc
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("vlan"), vlanParts[1])...)
 }
 
-func (r *networkBridgeVlanResource) modelToOptions(plan networkBridgeVlanModel) map[string]interface{} {
+func (r *networkBridgeVlanResource) modelToOptions(ctx context.Context, plan networkBridgeVlanModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Device.IsNull() {
@@ -262,7 +274,15 @@ func (r *networkBridgeVlanResource) modelToOptions(plan networkBridgeVlanModel) 
 		options["vlan"] = plan.VLAN.ValueInt64()
 	}
 	if !plan.Ports.IsNull() {
-		options["ports"] = plan.Ports.ValueString()
+		var portsMap map[string]string
+		diagnostics := plan.Ports.ElementsAs(ctx, &portsMap, false)
+		if !diagnostics.HasError() {
+			var portsList []string
+			for iface, flags := range portsMap {
+				portsList = append(portsList, iface+":"+flags)
+			}
+			options["ports"] = strings.Join(portsList, " ")
+		}
 	}
 
 	return options
@@ -277,7 +297,33 @@ func (r *networkBridgeVlanResource) optionsToModel(data map[string]interface{}, 
 			state.VLAN = types.Int64Value(int64(f))
 		}
 	}
-	if v, ok := data["ports"].(string); ok {
-		state.Ports = types.StringValue(v)
+	if ports, ok := data["ports"]; ok {
+		var portsMap map[string]string
+		switch v := ports.(type) {
+		case []interface{}:
+			portsMap = make(map[string]string)
+			for _, p := range v {
+				if s, ok := p.(string); ok {
+					parts := strings.SplitN(s, ":", 2)
+					if len(parts) == 2 {
+						portsMap[parts[0]] = parts[1]
+					}
+				}
+			}
+		case string:
+			if v != "" {
+				portsMap = make(map[string]string)
+				portsList := strings.Split(v, " ")
+				for _, p := range portsList {
+					parts := strings.SplitN(p, ":", 2)
+					if len(parts) == 2 {
+						portsMap[parts[0]] = parts[1]
+					}
+				}
+			}
+		}
+		if len(portsMap) > 0 {
+			state.Ports, _ = types.MapValueFrom(context.Background(), types.StringType, portsMap)
+		}
 	}
 }

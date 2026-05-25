@@ -33,8 +33,7 @@ resource "openwrt_uci_section" "lan" {
   options = {
     ifname  = "eth0"
     proto   = "static"
-    ipaddr  = "192.168.1.1"
-    netmask = "255.255.255.0"
+    ipaddr  = "192.168.1.1/24"
   }
 }
 
