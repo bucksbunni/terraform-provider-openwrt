@@ -22,13 +22,13 @@ resource "openwrt_network_globals" "main" {
 resource "openwrt_network_device" "br_lan" {
   name  = "br-lan"
   type  = "bridge"
-  ports = "eth0 eth1"
+  ports = ["eth0", "eth1"]
 }
 
 resource "openwrt_network_device" "br_guest" {
   name  = "br-guest"
   type  = "bridge"
-  ports = "eth2"
+  ports = ["eth2"]
 }
 
 resource "openwrt_network_interface" "loopback" {

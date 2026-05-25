@@ -26,7 +26,7 @@ type networkDeviceModel struct {
 	ID             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
 	Type           types.String `tfsdk:"type"`
-	Ports          types.String `tfsdk:"ports"`
+	Ports          types.List   `tfsdk:"ports"`
 	Policy         types.String `tfsdk:"policy"`
 	XmitHashPolicy types.String `tfsdk:"xmit_hash_policy"`
 }
@@ -54,9 +54,10 @@ func (r *networkDeviceResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Description: "Device type: 'bridge', 'bonding'.",
 			},
-			"ports": schema.StringAttribute{
+			"ports": schema.ListAttribute{
 				Optional:    true,
-				Description: "Member ports, space-separated (e.g., 'eth0 eth1').",
+				ElementType: types.StringType,
+				Description: "Member ports (e.g., ['eth0', 'eth1']).",
 			},
 			"policy": schema.StringAttribute{
 				Optional:    true,
@@ -90,7 +91,7 @@ func (r *networkDeviceResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	secName, err := r.client.UCIAdd(ctx, "network", "device")
 	if err != nil {
@@ -168,7 +169,7 @@ func (r *networkDeviceResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	devices, err := r.client.UCIForeach(ctx, "network", "device")
 	if err != nil {
@@ -261,14 +262,18 @@ func (r *networkDeviceResource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func (r *networkDeviceResource) modelToOptions(plan networkDeviceModel) map[string]interface{} {
+func (r *networkDeviceResource) modelToOptions(ctx context.Context, plan networkDeviceModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Type.IsNull() {
 		options["type"] = plan.Type.ValueString()
 	}
 	if !plan.Ports.IsNull() {
-		options["ports"] = plan.Ports.ValueString()
+		var portsList []string
+		diagnostics := plan.Ports.ElementsAs(ctx, &portsList, false)
+		if !diagnostics.HasError() {
+			options["ports"] = strings.Join(portsList, " ")
+		}
 	}
 	if !plan.Policy.IsNull() {
 		options["policy"] = plan.Policy.ValueString()
@@ -287,8 +292,22 @@ func (r *networkDeviceResource) optionsToModel(data map[string]interface{}, stat
 	if v, ok := data["name"].(string); ok {
 		state.Name = types.StringValue(v)
 	}
-	if v, ok := data["ports"].(string); ok {
-		state.Ports = types.StringValue(v)
+	if ports, ok := data["ports"]; ok {
+		switch v := ports.(type) {
+		case []interface{}:
+			var portsList []string
+			for _, p := range v {
+				if s, ok := p.(string); ok {
+					portsList = append(portsList, s)
+				}
+			}
+			state.Ports, _ = types.ListValueFrom(context.Background(), types.StringType, portsList)
+		case string:
+			if v != "" {
+				portsList := strings.Split(v, " ")
+				state.Ports, _ = types.ListValueFrom(context.Background(), types.StringType, portsList)
+			}
+		}
 	}
 	if v, ok := data["policy"].(string); ok {
 		state.Policy = types.StringValue(v)

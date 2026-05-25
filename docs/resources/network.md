@@ -82,7 +82,7 @@ Manages network devices (bridges, bonds, VLANs).
 | `name` | String | Yes | Device name (e.g., 'br-lan') |
 | `type` | String | Yes | Device type: 'bridge', 'bonding', 'vlan' |
 | `enabled` | Bool | No | Enable the device |
-| ` Bridge Ports | ports` | String | No | Bridge ports (space-separated) |
+| ` Bridge Ports | ports` | List(String) | No | Bridge ports (e.g., ['eth0', 'eth1']) |
 | ` Bridge Empty | bridge_empty` | Bool | No | Create empty bridge |
 | ` Bonding | policy` | String | No | Bonding policy (e.g., '802.3ad') |
 | ` Bonding | xmit_hash_policy` | String | No | Transmission hash policy |
@@ -96,14 +96,14 @@ Manages network devices (bridges, bonds, VLANs).
 resource "openwrt_network_device" "br_lan" {
   name  = "br-lan"
   type  = "bridge"
-  ports = "eth0 eth1"
+  ports = ["eth0", "eth1"]
 }
 
 # Bonding device
 resource "openwrt_network_device" "bond0" {
   name            = "bond0"
   type            = "bonding"
-  ports           = "eth1 eth2"
+  ports           = ["eth1", "eth2"]
   policy          = "802.3ad"
   xmit_hash_policy = "layer2+3"
 }
