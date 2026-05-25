@@ -157,39 +157,26 @@ func (r *sysModulesResource) ImportState(ctx context.Context, req resource.Impor
 
 func (r *sysModulesResource) readModulesFile(ctx context.Context) ([]string, error) {
 	modulesDir := "/etc/modules.d"
+	terraformMarker := "zz-terraform-managed"
 
-	result, err := r.client.SysCall(ctx, "exec", fmt.Sprintf("ls -la %s/ 2>/dev/null", modulesDir))
+	markerPath := filepath.Join(modulesDir, terraformMarker)
+	result, err := r.client.SysCall(ctx, "exec", fmt.Sprintf("test -f %s && cat %s || echo ''", markerPath, markerPath))
 	if err != nil {
 		return nil, err
 	}
 
 	var resultMap map[string]interface{}
 	if err := json.Unmarshal(result, &resultMap); err != nil {
-		return nil, err
-	}
-
-	msg, _ := resultMap["msg"].(string)
-	if msg == "" || strings.Contains(msg, "No such file") {
 		return []string{}, nil
 	}
 
-	listResult, err := r.client.SysCall(ctx, "exec", fmt.Sprintf("cat %s/* 2>/dev/null", modulesDir))
-	if err != nil {
-		return nil, err
-	}
-
-	var listMap map[string]interface{}
-	if err := json.Unmarshal(listResult, &listMap); err != nil {
-		return nil, err
-	}
-
-	listMsg, _ := listMap["msg"].(string)
-	if listMsg == "" {
+	msg, _ := resultMap["msg"].(string)
+	if msg == "" {
 		return []string{}, nil
 	}
 
 	var modules []string
-	lines := strings.Split(listMsg, "\n")
+	lines := strings.Split(msg, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line != "" && !strings.HasPrefix(line, "#") {
@@ -202,6 +189,7 @@ func (r *sysModulesResource) readModulesFile(ctx context.Context) ([]string, err
 
 func (r *sysModulesResource) writeModulesFile(ctx context.Context, modules []string) error {
 	modulesDir := "/etc/modules.d"
+	terraformMarker := "zz-terraform-managed"
 
 	sort.Strings(modules)
 
@@ -214,51 +202,23 @@ func (r *sysModulesResource) writeModulesFile(ctx context.Context, modules []str
 		}
 	}
 
-	command := fmt.Sprintf("mkdir -p %s", modulesDir)
+	markerPath := filepath.Join(modulesDir, terraformMarker)
+
+	if len(uniqueModules) == 0 {
+		command := fmt.Sprintf("rm -f %s", markerPath)
+		if _, err := r.client.SysCall(ctx, "exec", command); err != nil {
+			tflog.Warn(ctx, fmt.Sprintf("Failed to remove marker file: %v", err))
+		}
+		return nil
+	}
+
+	content := strings.Join(uniqueModules, "\n")
+	command := fmt.Sprintf("echo '%s' > %s", content, markerPath)
 	if _, err := r.client.SysCall(ctx, "exec", command); err != nil {
-		return fmt.Errorf("failed to create modules directory: %w", err)
+		return fmt.Errorf("failed to write modules file: %w", err)
 	}
 
-	existingModules, err := r.readModulesFile(ctx)
-	if err != nil {
-		tflog.Warn(ctx, "Could not read existing modules, will overwrite", map[string]interface{}{"error": err.Error()})
-		existingModules = []string{}
-	}
-
-	existingMap := make(map[string]bool)
-	for _, m := range existingModules {
-		existingMap[m] = true
-	}
-
-	for _, m := range uniqueModules {
-		if existingMap[m] {
-			continue
-		}
-
-		filename := filepath.Join(modulesDir, m)
-		command = fmt.Sprintf("echo '%s' > %s", m, filename)
-		if _, err := r.client.SysCall(ctx, "exec", command); err != nil {
-			return fmt.Errorf("failed to write module %s: %w", m, err)
-		}
-		tflog.Info(ctx, fmt.Sprintf("Added module to boot load: %s", m))
-	}
-
-	modulesToRemove := make(map[string]bool)
-	for _, m := range existingModules {
-		modulesToRemove[m] = true
-	}
-	for _, m := range uniqueModules {
-		delete(modulesToRemove, m)
-	}
-
-	for m := range modulesToRemove {
-		filename := filepath.Join(modulesDir, m)
-		command = fmt.Sprintf("rm -f %s", filename)
-		if _, err := r.client.SysCall(ctx, "exec", command); err != nil {
-			tflog.Warn(ctx, fmt.Sprintf("Failed to remove module %s: %v", m, err))
-		}
-		tflog.Info(ctx, fmt.Sprintf("Removed module from boot load: %s", m))
-	}
+	tflog.Info(ctx, fmt.Sprintf("Updated boot modules: %v", uniqueModules))
 
 	return nil
 }
