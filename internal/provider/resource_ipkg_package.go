@@ -48,13 +48,13 @@ func (r *ipkgPackageResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"autoremove": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
+				Default:     booldefault.StaticBool(true),
 				Description: "Remove packages that were installed automatically to satisfy dependencies.",
 			},
 			"force_remove": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
+				Default:     booldefault.StaticBool(true),
 				Description: "Remove package and all dependencies.",
 			},
 		},
