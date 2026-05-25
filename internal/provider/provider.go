@@ -177,6 +177,7 @@ func (p *openwrtProvider) Resources(_ context.Context) []func() resource.Resourc
 		// System actions
 		NewSysRebootResource,
 		NewSysModprobeResource,
+		NewSysModulesResource,
 	}
 }
 
@@ -202,6 +203,8 @@ func (p *openwrtProvider) DataSources(_ context.Context) []func() datasource.Dat
 
 		// Wireless
 		NewSysWirelessDataSource,
+		NewSysWirelessRadiosDataSource,
+		NewSysWirelessIfacesDataSource,
 	}
 }
 

@@ -31,6 +31,7 @@ type wirelessDeviceModel struct {
 	Band     types.String `tfsdk:"band"`
 	Channel  types.Int64  `tfsdk:"channel"`
 	HTMode   types.String `tfsdk:"htmode"`
+	HWMode   types.String `tfsdk:"hwmode"`
 	Country  types.String `tfsdk:"country"`
 	Disabled types.Bool   `tfsdk:"disabled"`
 }
@@ -75,6 +76,10 @@ func (r *wirelessDeviceResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"htmode": schema.StringAttribute{
 				Optional:    true,
 				Description: "Channel width/HT mode (e.g., 'VHT80', 'HT40', 'HE80').",
+			},
+			"hwmode": schema.StringAttribute{
+				Optional:    true,
+				Description: "Hardware mode: '11a', '11g', '11n', '11ac', '11ax'. Auto-detected if not set.",
 			},
 			"country": schema.StringAttribute{
 				Optional:    true,
@@ -126,6 +131,9 @@ func (r *wirelessDeviceResource) Create(ctx context.Context, req resource.Create
 	}
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+	}
+	if err := r.client.WifiReload(ctx); err != nil {
+		tflog.Warn(ctx, "WiFi reload failed", map[string]interface{}{"error": err.Error()})
 	}
 
 	plan.ID = types.StringValue(fmt.Sprintf("wireless/%s", name))
@@ -192,6 +200,11 @@ func (r *wirelessDeviceResource) Update(ctx context.Context, req resource.Update
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+	if err := r.client.WifiReload(ctx); err != nil {
+		tflog.Warn(ctx, "WiFi reload failed", map[string]interface{}{"error": err.Error()})
+	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("wireless/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -250,6 +263,9 @@ func (r *wirelessDeviceResource) modelToOptions(plan wirelessDeviceModel) map[st
 	if !plan.HTMode.IsNull() {
 		options["htmode"] = plan.HTMode.ValueString()
 	}
+	if !plan.HWMode.IsNull() {
+		options["hwmode"] = plan.HWMode.ValueString()
+	}
 	if !plan.Country.IsNull() {
 		options["country"] = plan.Country.ValueString()
 	}
@@ -279,6 +295,9 @@ func (r *wirelessDeviceResource) optionsToModel(data map[string]interface{}, sta
 	}
 	if v, ok := data["htmode"].(string); ok {
 		state.HTMode = types.StringValue(v)
+	}
+	if v, ok := data["hwmode"].(string); ok {
+		state.HWMode = types.StringValue(v)
 	}
 	if v, ok := data["country"].(string); ok {
 		state.Country = types.StringValue(v)

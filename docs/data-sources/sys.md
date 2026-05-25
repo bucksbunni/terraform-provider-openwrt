@@ -147,6 +147,83 @@ output "signal_strength" {
 
 ---
 
+## openwrt_sys_wireless_radios
+
+Discovers available wireless radio devices from OpenWrt's UCI configuration.
+
+### Schema
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | String | Always 'wireless_radios' |
+| `radios` | List | List of wireless radio objects |
+
+#### radios Object
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `name` | String | Radio name (e.g., radio0) |
+| `type` | String | Driver type (mac80211, broadcom) |
+| `path` | String | Hardware path |
+| `band` | String | Supported band (2g, 5g, 6g) |
+| `channel` | Int64 | Current channel |
+| `htmode` | String | Channel width (HT40, VHT80, etc.) |
+| `hwmode` | String | Hardware mode (11a, 11g, 11n, 11ac, 11ax) |
+| `country` | String | Country code |
+| `txpower` | Int64 | Transmit power |
+| `disabled` | Bool | Whether radio is disabled |
+
+### Example
+
+```hcl
+data "openwrt_sys_wireless_radios" "available" {}
+
+output "radio_count" {
+  value = length(data.openwrt_sys_wireless_radios.available.radios)
+}
+```
+
+---
+
+## openwrt_sys_wireless_ifaces
+
+Discovers wireless interfaces from OpenWrt's UCI configuration.
+
+### Schema
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | String | Always 'wireless_ifaces' |
+| `interfaces` | List | List of wireless interface objects |
+
+#### interfaces Object
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `name` | String | Interface name (e.g., wifinet0) |
+| `device` | String | Parent radio device |
+| `mode` | String | Operation mode (ap, sta, adhoc, etc.) |
+| `ssid` | String | Network SSID |
+| `encryption` | String | Encryption mode |
+| `network` | String | Attached network |
+| `disabled` | Bool | Whether interface is disabled |
+| `hidden` | Bool | Whether SSID is hidden |
+| `macfilter` | String | MAC filter mode |
+| `maclist` | String | MAC address list |
+| `isolate` | Bool | Client isolation enabled |
+
+### Example
+
+```hcl
+data "openwrt_sys_wireless_ifaces" "existing" {}
+
+output "interface_count" {
+  value = length(data.openwrt_sys_wireless_ifaces.interfaces)
+}
+```
+
+---
+
 ## openwrt_sys_rpc
 
 Low-level access to the /rpc/sys JSON-RPC API.

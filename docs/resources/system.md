@@ -311,6 +311,45 @@ resource "openwrt_sys_modprobe" "unload_ath10k" {
 
 ---
 
+## openwrt_sys_modules
+
+Manages kernel modules to load at boot time on OpenWrt device. Creates entries in `/etc/modules.d/` so modules are loaded automatically during system boot.
+
+### Schema
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | String | Computed | Internal ID (sys_modules) |
+| `modules` | List | Yes | List of kernel module names to load at boot |
+
+### Example
+
+```hcl
+# Configure wireless modules to load at boot
+resource "openwrt_sys_modules" "boot_modules" {
+  modules = ["ath10k_pci", "ath10k_core"]
+}
+```
+
+### Notes
+
+- Unlike `openwrt_sys_modprobe` which loads modules at runtime, this resource configures modules to load automatically during boot
+- This is more reliable for hardware-dependent modules like wireless drivers that require full system initialization
+- Use with `openwrt_ipkg_package` to ensure kernel module packages are installed first
+- After adding modules, a reboot may be required for them to take effect
+- The resource manages `/etc/modules.d/` by creating one file per module
+
+### Why use sys_modules instead of sys_modprobe for WiFi?
+
+Wireless drivers (like ath10k) require the kernel module to be loaded before network services start. Using `sys_modprobe` at runtime can cause race conditions where:
+1. Terraform applies the wireless configuration immediately after loading the module
+2. The network daemon (netifd) tries to start hostapd before the driver is fully initialized
+3. WiFi fails to start with "HOSTAPD_START_FAILED"
+
+Using `openwrt_sys_modules` ensures modules load in the proper sequence during boot, avoiding this issue.
+
+---
+
 ## Import
 
 System resources can be imported using the config name and section name:
@@ -327,4 +366,5 @@ terraform import openwrt_rpcd.main rpcd
 # Sys resources
 terraform import openwrt_sys_reboot.main sys_reboot
 terraform import openwrt_sys_modprobe.ath10k sys_modprobe/ath10k_pci
+terraform import openwrt_sys_modules.boot_modules sys_modules
 ```

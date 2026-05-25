@@ -30,20 +30,48 @@ Manages wireless radio devices.
 | `band` | String | No | Radio band: '2g', '5g', '6g' |
 | `channel` | Int64 | No | Wireless channel number |
 | `htmode` | String | No | Channel width (e.g., 'VHT80', 'HT40', 'HE80') |
+| `hwmode` | String | No | Hardware mode: '11a', '11g', '11n', '11ac', '11ax'. Auto-detected if not set. |
 | `country` | String | No | Country code |
 | `disabled` | Bool | No | Disable the radio |
+
+### Mode Selection
+
+The wireless mode is controlled by `hwmode`:
+- `11g` - 2.4GHz, 802.11b/g only (Legacy)
+- `11n` - 2.4GHz, 802.11n
+- `11a` - 5GHz, 802.11a only (Legacy)
+- `11ac` - 5GHz, 802.11ac
+- `11ax` - 6GHz, 802.11ax
+
+If not set, the mode is auto-detected based on `band` and `htmode`:
+- `band="2g"` + `htmode="HT20"` or `htmode="HT40"` = 802.11n
+- `band="5g"` + `htmode="HT20"` or `htmode="HT40"` = 802.11n
+- `band="5g"` + `htmode="VHT80"` = 802.11ac
 
 ### Example
 
 ```hcl
-resource "openwrt_wireless_device" "radio0" {
+# 802.11ac (5GHz)
+resource "openwrt_wireless_device" "radio0_5g" {
   name     = "radio0"
   type     = "mac80211"
   path     = "pci0000:00/0000:00:02.5/0000:04:00.0"
   band     = "5g"
   channel  = 44
   htmode   = "VHT80"
+  hwmode   = "11ac"
   country  = "DE"
+  disabled = false
+}
+
+# 802.11n (2.4GHz)
+resource "openwrt_wireless_device" "radio1_2g" {
+  name     = "radio1"
+  type     = "mac80211"
+  band     = "2g"
+  channel  = 6
+  htmode   = "HT40"
+  hwmode   = "11n"
   disabled = false
 }
 ```

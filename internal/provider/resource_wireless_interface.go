@@ -150,6 +150,9 @@ func (r *wirelessInterfaceResource) Create(ctx context.Context, req resource.Cre
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+	if err := r.client.WifiReload(ctx); err != nil {
+		tflog.Warn(ctx, "WiFi reload failed", map[string]interface{}{"error": err.Error()})
+	}
 
 	plan.ID = types.StringValue(fmt.Sprintf("wireless/%s", name))
 
@@ -215,6 +218,11 @@ func (r *wirelessInterfaceResource) Update(ctx context.Context, req resource.Upd
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+	if err := r.client.WifiReload(ctx); err != nil {
+		tflog.Warn(ctx, "WiFi reload failed", map[string]interface{}{"error": err.Error()})
+	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("wireless/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
