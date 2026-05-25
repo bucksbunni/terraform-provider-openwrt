@@ -233,8 +233,6 @@ resource "openwrt_rpcd" "main" {
 
 ---
 
----
-
 ## openwrt_sys_reboot
 
 Triggers a reboot of the OpenWrt device.
@@ -245,7 +243,6 @@ Triggers a reboot of the OpenWrt device.
 |-----------|------|----------|-------------|
 | `id` | String | Computed | Internal ID (sys_reboot) |
 | `delay` | Int64 | No | Delay in seconds before rebooting (default: 0) |
-| `message` | String | No | Shutdown message (default: "Rebooting via Terraform") |
 
 ### Example
 
@@ -253,10 +250,9 @@ Triggers a reboot of the OpenWrt device.
 # Reboot immediately
 resource "openwrt_sys_reboot" "now" {}
 
-# Reboot after delay with message
+# Reboot after delay
 resource "openwrt_sys_reboot" "delayed" {
   delay    = 10
-  message  = "System maintenance reboot"
 }
 ```
 

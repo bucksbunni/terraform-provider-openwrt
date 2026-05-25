@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -24,9 +23,8 @@ type sysRebootResource struct {
 }
 
 type sysRebootModel struct {
-	ID      types.String `tfsdk:"id"`
-	Delay   types.Int64  `tfsdk:"delay"`
-	Message types.String `tfsdk:"message"`
+	ID    types.String `tfsdk:"id"`
+	Delay types.Int64  `tfsdk:"delay"`
 }
 
 func (r *sysRebootResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -46,12 +44,6 @@ func (r *sysRebootResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 				Default:     int64default.StaticInt64(0),
 				Description: "Delay in seconds before rebooting.",
-			},
-			"message": schema.StringAttribute{
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("Rebooting via Terraform"),
-				Description: "Shutdown message.",
 			},
 		},
 	}

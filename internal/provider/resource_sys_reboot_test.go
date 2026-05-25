@@ -18,7 +18,7 @@ func TestSysRebootResource_Schema(t *testing.T) {
 		t.Fatalf("expected correct description, got %q", s.Description)
 	}
 
-	expectedAttrs := []string{"id", "delay", "message"}
+	expectedAttrs := []string{"id", "delay"}
 	for _, attr := range expectedAttrs {
 		if _, ok := s.Attributes[attr]; !ok {
 			t.Fatalf("expected %s attribute", attr)
