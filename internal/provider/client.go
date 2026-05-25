@@ -40,9 +40,16 @@ type JsonRpcClient struct {
 	// ipkgMu specifically protects IPKG operations to prevent race conditions
 	// when multiple resources check package installation status concurrently
 	ipkgMu sync.Mutex
-	
+
+	// token is set once after login and used for all subsequent RPC calls.
+	// It is stable for the client lifetime, so passing via context would add
+	// boilerplate without benefit. Use CallWithToken() if per-call override needed.
 	token string
-	id    int64
+
+	// id is an incrementing counter for JSON-RPC request identification.
+	// It's an internal implementation detail; context should carry request-
+	// scoped concerns (cancellation, timeouts), not protocol bookkeeping.
+	id int64
 }
 
 // NewJsonRpcClient creates a new JSON-RPC client for communicating with OpenWrt's LuCI API.
