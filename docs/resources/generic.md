@@ -104,7 +104,8 @@ Manages package installation/removal via opkg.
 |-----------|------|----------|-------------|
 | `id` | String | Computed | Internal ID (equals package name) |
 | `name` | String | Yes | Package name as known to opkg |
-| `autoremove` | Bool | No | Remove unused dependencies when package is removed (default: false) |
+| `autoremove` | Bool | No | Remove packages that were installed automatically to satisfy dependencies (default: false) |
+| `force_remove` | Bool | No | Remove package and all dependencies (default: false) |
 
 ### Example
 
@@ -118,6 +119,12 @@ resource "openwrt_ipkg_package" "luci_mod_rpc" {
 resource "openwrt_ipkg_package" "ath10k" {
   name       = "kmod-ath10k"
   autoremove = true
+}
+
+# Install and force removal of dependent packages
+resource "openwrt_ipkg_package" "ath10k_fw" {
+  name         = "ath10k-firmware-qca988x"
+  force_remove = true
 }
 
 # Install firewall utility

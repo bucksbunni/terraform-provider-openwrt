@@ -23,9 +23,10 @@ type ipkgPackageResource struct {
 }
 
 type ipkgPackageModel struct {
-	ID         types.String `tfsdk:"id"`
-	Name       types.String `tfsdk:"name"`
-	AutoRemove types.Bool   `tfsdk:"autoremove"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	AutoRemove  types.Bool   `tfsdk:"autoremove"`
+	ForceRemove types.Bool   `tfsdk:"force_remove"`
 }
 
 func (r *ipkgPackageResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -48,7 +49,13 @@ func (r *ipkgPackageResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
-				Description: "Remove unused dependencies when package is removed.",
+				Description: "Remove packages that were installed automatically to satisfy dependencies.",
+			},
+			"force_remove": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Description: "Remove package and all dependencies.",
 			},
 		},
 	}
@@ -127,8 +134,9 @@ func (r *ipkgPackageResource) Delete(ctx context.Context, req resource.DeleteReq
 
 	name := state.Name.ValueString()
 	autoremove := state.AutoRemove.ValueBool()
+	forceRemove := state.ForceRemove.ValueBool()
 
-	if err := r.client.IPKGRemove(ctx, name, autoremove); err != nil {
+	if err := r.client.IPKGRemove(ctx, name, autoremove, forceRemove); err != nil {
 		resp.Diagnostics.AddError("Error removing package", err.Error())
 		return
 	}
