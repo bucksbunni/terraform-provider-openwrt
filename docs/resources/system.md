@@ -53,7 +53,7 @@ Manages NTP (timeserver) configuration.
 | `id` | String | Computed | Internal ID |
 | `name` | String | Yes | Config name |
 | `enabled` | Bool | No | Enable NTP client |
-| `server` | String | No | NTP servers (space-separated) |
+| `server` | List(String) | No | NTP servers (e.g., ['0.openwrt.pool.ntp.org', '1.openwrt.pool.ntp.org']) |
 | `use_dhcp` | Bool | No | Use servers from DHCP |
 
 ### Example
@@ -62,7 +62,7 @@ Manages NTP (timeserver) configuration.
 resource "openwrt_system_ntp" "main" {
   name    = "ntp"
   enabled = true
-  server  = "0.openwrt.pool.ntp.org 1.openwrt.pool.ntp.org"
+  server  = ["0.openwrt.pool.ntp.org", "1.openwrt.pool.ntp.org"]
 }
 ```
 
@@ -146,8 +146,8 @@ Manages uHTTPd web server settings.
 |-----------|------|----------|-------------|
 | `id` | String | Computed | Internal ID |
 | `name` | String | Yes | Instance name |
-| `listen_http` | String | No | HTTP listeners |
-| `listen_https` | String | No | HTTPS listeners |
+| `listen_http` | List(String) | No | HTTP listeners (e.g., ['0.0.0.0:80', '[::]:80']) |
+| `listen_https` | List(String) | No | HTTPS listeners (e.g., ['0.0.0.0:443', '[::]:443']) |
 | `redirect_https` | Bool | No | Redirect HTTP to HTTPS |
 | `home` | String | No | Document root |
 | `rfc1918_filter` | Bool | No | Filter private addresses |
@@ -161,8 +161,8 @@ Manages uHTTPd web server settings.
 ```hcl
 resource "openwrt_uhttpd" "main" {
   name              = "main"
-  listen_http       = "0.0.0.0:80 [::]:80"
-  listen_https     = "0.0.0.0:443 [::]:443"
+  listen_http       = ["0.0.0.0:80", "[::]:80"]
+  listen_https     = ["0.0.0.0:443", "[::]:443"]
   redirect_https    = true
   home              = "/www"
   rfc1918_filter   = true

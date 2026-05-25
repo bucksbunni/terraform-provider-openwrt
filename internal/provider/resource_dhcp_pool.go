@@ -35,7 +35,7 @@ type dhcpPoolModel struct {
 	DHCPv4    types.String `tfsdk:"dhcpv4"`
 	DHCPv6    types.String `tfsdk:"dhcpv6"`
 	RA        types.String `tfsdk:"ra"`
-	RAFlags   types.String `tfsdk:"ra_flags"`
+	RAFlags   types.List   `tfsdk:"ra_flags"`
 	Ignore    types.Bool   `tfsdk:"ignore"`
 }
 
@@ -94,9 +94,10 @@ func (r *dhcpPoolResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional:    true,
 				Description: "Router Advertisement mode: 'server', 'hybrid', 'relay', 'disabled'.",
 			},
-			"ra_flags": schema.StringAttribute{
+			"ra_flags": schema.ListAttribute{
 				Optional:    true,
-				Description: "RA flags: space-separated list (e.g., 'managed-config other-config').",
+				ElementType: types.StringType,
+				Description: "RA flags (e.g., ['managed-config', 'other-config']).",
 			},
 			"ignore": schema.BoolAttribute{
 				Optional:    true,
@@ -126,7 +127,7 @@ func (r *dhcpPoolResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	secName, err := r.client.UCIAdd(ctx, "dhcp", "dhcp")
 	if err != nil {
@@ -205,7 +206,7 @@ func (r *dhcpPoolResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	pools, err := r.client.UCIForeach(ctx, "dhcp", "dhcp")
 	if err != nil {
@@ -298,7 +299,7 @@ func (r *dhcpPoolResource) ImportState(ctx context.Context, req resource.ImportS
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func (r *dhcpPoolResource) modelToOptions(plan dhcpPoolModel) map[string]interface{} {
+func (r *dhcpPoolResource) modelToOptions(ctx context.Context, plan dhcpPoolModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Interface.IsNull() {
@@ -323,7 +324,11 @@ func (r *dhcpPoolResource) modelToOptions(plan dhcpPoolModel) map[string]interfa
 		options["ra"] = plan.RA.ValueString()
 	}
 	if !plan.RAFlags.IsNull() {
-		options["ra_flags"] = plan.RAFlags.ValueString()
+		var flagsList []string
+		diagnostics := plan.RAFlags.ElementsAs(ctx, &flagsList, false)
+		if !diagnostics.HasError() {
+			options["ra_flags"] = strings.Join(flagsList, " ")
+		}
 	}
 	if !plan.Ignore.IsNull() {
 		if plan.Ignore.ValueBool() {
@@ -383,8 +388,22 @@ func (r *dhcpPoolResource) optionsToModel(data map[string]interface{}, state *dh
 	if v, ok := data["ra"].(string); ok {
 		state.RA = types.StringValue(v)
 	}
-	if v, ok := data["ra_flags"].(string); ok {
-		state.RAFlags = types.StringValue(v)
+	if flags, ok := data["ra_flags"]; ok {
+		switch v := flags.(type) {
+		case []interface{}:
+			var flagsList []string
+			for _, f := range v {
+				if s, ok := f.(string); ok {
+					flagsList = append(flagsList, s)
+				}
+			}
+			state.RAFlags, _ = types.ListValueFrom(context.Background(), types.StringType, flagsList)
+		case string:
+			if v != "" {
+				flagsList := strings.Split(v, " ")
+				state.RAFlags, _ = types.ListValueFrom(context.Background(), types.StringType, flagsList)
+			}
+		}
 	}
 	if v, ok := data["ignore"].(string); ok {
 		state.Ignore = types.BoolValue(v == "1" || v == "true")

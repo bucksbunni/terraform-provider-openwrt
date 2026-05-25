@@ -166,7 +166,7 @@ resource "openwrt_firewall_rule" "allow_ping_wan" {
   name      = "Allow-Ping-WAN"
   src       = "wan"
   proto     = "icmp"
-  icmp_type = "echo-request"
+  icmp_type = ["echo-request"]
   target    = "ACCEPT"
   family    = "ipv4"
 }
@@ -221,7 +221,7 @@ resource "openwrt_firewall_rule" "allow_icmpv6_wan" {
   proto      = "icmp"
   target     = "ACCEPT"
   family     = "ipv6"
-  icmp_type  = "echo-request echo-reply destination-unreachable packet-too-big time-exceeded"
+  icmp_type  = ["echo-request", "echo-reply", "destination-unreachable", "packet-too-big", "time-exceeded"]
 }
 
 resource "openwrt_dhcp_dnsmasq" "main" {
@@ -257,7 +257,7 @@ resource "openwrt_dhcp_pool" "lan" {
   dhcpv4     = "server"
   ra         = "server"
   dhcpv6     = "server"
-  ra_flags   = "managed-config other-config"
+  ra_flags   = ["managed-config", "other-config"]
 }
 
 resource "openwrt_dhcp_pool" "guest" {

@@ -49,7 +49,7 @@ resource "openwrt_dhcp_pool" "lan" {
   dhcpv4     = "server"
   ra         = "server"
   dhcpv6     = "server"
-  ra_flags   = "managed-config other-config"
+  ra_flags   = ["managed-config", "other-config"]
 }
 
 resource "openwrt_dhcp_pool" "guest" {
@@ -82,7 +82,7 @@ resource "openwrt_dhcp_pool" "guest_v6" {
   dhcpv4     = "disabled"
   ra         = "server"
   dhcpv6     = "server"
-  ra_flags   = "managed-config"
+  ra_flags   = ["managed-config"]
 }
 
 resource "openwrt_dhcp_host" "server_static" {

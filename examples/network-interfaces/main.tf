@@ -89,7 +89,7 @@ resource "openwrt_network_wireguard" "peer_nordvpn" {
   endpoint_host = "no123.nordvpn.com"
   endpoint_port = 51820
   persistent_keepalive = 25
-  allowed_ips   = "0.0.0.0/0"
+  allowed_ips   = ["0.0.0.0/0"]
 }
 
 output "lan_ip" {

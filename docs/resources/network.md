@@ -190,7 +190,7 @@ Manages WireGuard VPN peers.
 | `mtu` | Int64 | No | MTU |
 | `endpoint_host` | String | No | Endpoint host |
 | `endpoint_port` | Int64 | No | Endpoint port |
-| `allowed_ips` | String | No | Allowed IPs |
+| `allowed_ips` | List(String) | No | Allowed IPs (e.g., ['10.0.0.2/32', '10.0.0.0/24']) |
 | `persistent_keepalive` | Int64 | No | Keepalive interval (seconds) |
 
 ### Example
@@ -211,7 +211,7 @@ resource "openwrt_network_wireguard" "peer1" {
   endpoint_host         = "vpn.example.com"
   endpoint_port         = 51820
   persistent_keepalive  = 25
-  allowed_ips           = "10.0.0.2/32 10.0.0.0/24"
+  allowed_ips           = ["10.0.0.2/32", "10.0.0.0/24"]
 }
 ```
 

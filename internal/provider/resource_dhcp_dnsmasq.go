@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -35,8 +36,8 @@ type dhcpDNSMasqModel struct {
 	LocalService     types.Bool   `tfsdk:"localservice"`
 	EDNSPacketMax    types.Int64  `tfsdk:"ednspacket_max"`
 	ConfDir          types.String `tfsdk:"confdir"`
-	RebindDomain     types.String `tfsdk:"rebind_domain"`
-	Server           types.String `tfsdk:"server"`
+	RebindDomain     types.List   `tfsdk:"rebind_domain"`
+	Server           types.List   `tfsdk:"server"`
 }
 
 func (r *dhcpDNSMasqResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -111,13 +112,15 @@ func (r *dhcpDNSMasqResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Optional:    true,
 				Description: "Additional configuration directory.",
 			},
-			"rebind_domain": schema.StringAttribute{
+			"rebind_domain": schema.ListAttribute{
 				Optional:    true,
-				Description: "Domain whitelist for rebind protection (space-separated).",
+				ElementType: types.StringType,
+				Description: "Domain whitelist for rebind protection (e.g., ['example.com']).",
 			},
-			"server": schema.StringAttribute{
+			"server": schema.ListAttribute{
 				Optional:    true,
-				Description: "Upstream DNS servers (space-separated).",
+				ElementType: types.StringType,
+				Description: "Upstream DNS servers (e.g., ['8.8.8.8', '1.1.1.1']).",
 			},
 		},
 	}
@@ -142,7 +145,7 @@ func (r *dhcpDNSMasqResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	_, err := r.client.UCISection(ctx, "dhcp", "dnsmasq", "dnsmasq", options)
 	if err != nil {
@@ -192,7 +195,7 @@ func (r *dhcpDNSMasqResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	if err := r.client.UCITSet(ctx, "dhcp", "dnsmasq", options); err != nil {
 		resp.Diagnostics.AddError("Error updating dnsmasq config", err.Error())
@@ -232,7 +235,7 @@ func (r *dhcpDNSMasqResource) Delete(ctx context.Context, req resource.DeleteReq
 	resp.State.RemoveResource(ctx)
 }
 
-func (r *dhcpDNSMasqResource) modelToOptions(plan dhcpDNSMasqModel) map[string]interface{} {
+func (r *dhcpDNSMasqResource) modelToOptions(ctx context.Context, plan dhcpDNSMasqModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.DomainNeeded.IsNull() {
@@ -281,10 +284,18 @@ func (r *dhcpDNSMasqResource) modelToOptions(plan dhcpDNSMasqModel) map[string]i
 		options["confdir"] = plan.ConfDir.ValueString()
 	}
 	if !plan.RebindDomain.IsNull() {
-		options["rebind_domain"] = plan.RebindDomain.ValueString()
+		var domainList []string
+		diagnostics := plan.RebindDomain.ElementsAs(ctx, &domainList, false)
+		if !diagnostics.HasError() {
+			options["rebind_domain"] = strings.Join(domainList, " ")
+		}
 	}
 	if !plan.Server.IsNull() {
-		options["server"] = plan.Server.ValueString()
+		var serverList []string
+		diagnostics := plan.Server.ElementsAs(ctx, &serverList, false)
+		if !diagnostics.HasError() {
+			options["server"] = strings.Join(serverList, " ")
+		}
 	}
 
 	return options
@@ -340,11 +351,39 @@ func (r *dhcpDNSMasqResource) optionsToModel(data map[string]interface{}, state 
 	if v, ok := data["confdir"].(string); ok {
 		state.ConfDir = types.StringValue(v)
 	}
-	if v, ok := data["rebind_domain"].(string); ok {
-		state.RebindDomain = types.StringValue(v)
+	if domain, ok := data["rebind_domain"]; ok {
+		switch v := domain.(type) {
+		case []interface{}:
+			var domainList []string
+			for _, d := range v {
+				if s, ok := d.(string); ok {
+					domainList = append(domainList, s)
+				}
+			}
+			state.RebindDomain, _ = types.ListValueFrom(context.Background(), types.StringType, domainList)
+		case string:
+			if v != "" {
+				domainList := strings.Split(v, " ")
+				state.RebindDomain, _ = types.ListValueFrom(context.Background(), types.StringType, domainList)
+			}
+		}
 	}
-	if v, ok := data["server"].(string); ok {
-		state.Server = types.StringValue(v)
+	if server, ok := data["server"]; ok {
+		switch v := server.(type) {
+		case []interface{}:
+			var serverList []string
+			for _, s := range v {
+				if str, ok := s.(string); ok {
+					serverList = append(serverList, str)
+				}
+			}
+			state.Server, _ = types.ListValueFrom(context.Background(), types.StringType, serverList)
+		case string:
+			if v != "" {
+				serverList := strings.Split(v, " ")
+				state.Server, _ = types.ListValueFrom(context.Background(), types.StringType, serverList)
+			}
+		}
 	}
 }
 
