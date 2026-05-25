@@ -177,6 +177,7 @@ func (p *openwrtProvider) Resources(_ context.Context) []func() resource.Resourc
 		// System actions
 		NewSysRebootResource,
 		NewSysModprobeResource,
+		NewSysModulesResource,
 	}
 }
 
