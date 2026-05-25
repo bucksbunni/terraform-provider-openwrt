@@ -282,6 +282,14 @@ func (c *JsonRpcClient) UCIApply(ctx context.Context, rollback bool) error {
 	return err
 }
 
+func (c *JsonRpcClient) WifiReload(ctx context.Context) error {
+	_, err := c.SysCall(ctx, "exec", "wifi reload 2>&1")
+	if err != nil {
+		return fmt.Errorf("wifi reload failed: %w", err)
+	}
+	return nil
+}
+
 func (c *JsonRpcClient) UCITSet(ctx context.Context, config, section string, values map[string]interface{}) error {
 	_, err := c.call(ctx, "uci", "tset", config, section, values)
 	return err
