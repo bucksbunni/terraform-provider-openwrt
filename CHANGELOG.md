@@ -28,6 +28,8 @@ All notable changes to the terraform-provider-openwrt will be documented in this
 ### Fixed
 
 - **wireless_interface**: Fixed Read function to use UCIForeach with `.name` matching instead of UCIGetAll
+- **wireless_device**: Fixed Update function to set ID before saving state (was causing "unknown ID" error)
+- **wireless_interface**: Fixed Update function to set ID before saving state (was causing "unknown ID" error)
 - **wireless_device**: Fixed Read function to use UCIForeach with `.name` matching instead of UCIGetAll
 - **network_interface**: Fixed Create to use UCISetSection for named UCI sections; Fixed Read to search by `.name` (section name)
 - **network_bridge_vlan**: Fixed Read to match by device+vlan; Fixed Create to use anonymous sections for OpenWrt 24.10 compatibility; Fixed Delete to find section by device+vlan
