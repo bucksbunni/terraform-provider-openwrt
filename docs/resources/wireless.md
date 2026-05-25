@@ -9,6 +9,12 @@ description: |-
 
 For detailed setup instructions, including driver and firmware installation, see the [Wireless Setup Guide](../guides/wireless-setup.md).
 
+-> **Important:** After installing kernel module packages (e.g., `kmod-ath10k`), you must either:
+> 1. Use `openwrt_sys_modprobe` to load the driver module, or
+> 2. Use `openwrt_sys_reboot` to reboot the device so the module loads automatically
+>
+> The wireless radio will not appear until the kernel module is loaded. Use `openwrt_sys_wireless_info` data source to verify the radio is detected.
+
 ## openwrt_wireless_device
 
 Manages wireless radio devices.

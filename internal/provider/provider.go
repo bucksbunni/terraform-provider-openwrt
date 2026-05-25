@@ -173,6 +173,10 @@ func (p *openwrtProvider) Resources(_ context.Context) []func() resource.Resourc
 
 		// RPC Daemon
 		NewRPCDResource,
+
+		// System actions
+		NewSysRebootResource,
+		NewSysModprobeResource,
 	}
 }
 
