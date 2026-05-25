@@ -37,6 +37,12 @@ opkg list | grep -E 'kmod-|ath10k|brcmfmac|mt76'
 
 ## Installing via Terraform
 
+-> **Important:** The first time you install kernel modules, you must:
+> 1. Ensure package lists are up to date (run `opkg update` manually first, or use the ipkg_package resource with the implicit update flag)
+> 2. Install the kernel module package via Terraform
+> 3. Add the module to `/etc/modules.d/` using `openwrt_sys_modules`
+> 4. **Reboot the device** using `openwrt_sys_reboot` - kernel modules require a reboot to load properly
+
 Use the `openwrt_ipkg_package` resource to install the required packages:
 
 ```hcl
