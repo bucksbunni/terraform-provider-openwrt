@@ -67,7 +67,9 @@ resource "openwrt_network_interface" "guest" {
 resource "openwrt_network_bridge_vlan" "guest_vlan10" {
   device = "br-guest"
   vlan   = 10
-  ports  = "eth2:t"
+  ports  = {
+    "eth2" = "t"
+  }
 }
 
 resource "openwrt_firewall_defaults" "main" {

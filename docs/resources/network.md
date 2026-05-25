@@ -122,7 +122,7 @@ Manages bridge VLAN assignments.
 | `id` | String | Computed | Internal ID |
 | `device` | String | Yes | Bridge device name |
 | `vlan` | Int64 | Yes | VLAN ID |
-| `ports` | String | Yes | Ports with flags (e.g., 'eth0:u* eth1:t') |
+| `ports` | Map(String) | Yes | Ports with flags (e.g., {eth0 = 'u*', eth1 = 't'}) |
 
 ### Example
 
@@ -130,13 +130,19 @@ Manages bridge VLAN assignments.
 resource "openwrt_network_bridge_vlan" "vlan1" {
   device = "br-lan"
   vlan   = 1
-  ports  = "eth0:u* eth1:u*"
+  ports  = {
+    "eth0" = "u*"
+    "eth1" = "u*"
+  }
 }
 
 resource "openwrt_network_bridge_vlan" "vlan10" {
   device = "br-lan"
   vlan   = 10
-  ports  = "eth2:t eth3:t"
+  ports  = {
+    "eth2" = "t"
+    "eth3" = "t"
+  }
 }
 ```
 
