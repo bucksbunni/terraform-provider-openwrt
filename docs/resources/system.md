@@ -233,6 +233,88 @@ resource "openwrt_rpcd" "main" {
 
 ---
 
+---
+
+## openwrt_sys_reboot
+
+Triggers a reboot of the OpenWrt device.
+
+### Schema
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | String | Computed | Internal ID (sys_reboot) |
+| `delay` | Int64 | No | Delay in seconds before rebooting (default: 0) |
+| `message` | String | No | Shutdown message (default: "Rebooting via Terraform") |
+
+### Example
+
+```hcl
+# Reboot immediately
+resource "openwrt_sys_reboot" "now" {}
+
+# Reboot after delay with message
+resource "openwrt_sys_reboot" "delayed" {
+  delay    = 10
+  message  = "System maintenance reboot"
+}
+```
+
+### Notes
+
+- The `delay` attribute causes Terraform to wait before sending the reboot command
+- After reboot, the resource will be removed from state and must be re-applied
+- Use `terraform apply -refresh=false` after reboot to avoid errors
+
+---
+
+## openwrt_sys_modprobe
+
+Loads or unloads a kernel module on the OpenWrt device.
+
+### Schema
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | String | Computed | Internal ID (sys_modprobe/<module_name>) |
+| `name` | String | Yes | Name of the kernel module |
+| `action` | String | No | Action: 'load' (default) or 'unload' |
+| `param` | Map | No | Module parameters as key-value pairs |
+| `output` | String | Computed | Output from modprobe command |
+
+### Example
+
+```hcl
+# Load wireless driver module
+resource "openwrt_sys_modprobe" "ath10k" {
+  name   = "ath10k_pci"
+  action = "load"
+}
+
+# Load module with parameters
+resource "openwrt_sys_modprobe" "ath10k_debug" {
+  name   = "ath10k_pci"
+  action = "load"
+  param = {
+    debug = "2"
+  }
+}
+
+# Unload module
+resource "openwrt_sys_modprobe" "unload_ath10k" {
+  name   = "ath10k_pci"
+  action = "unload"
+}
+```
+
+### Notes
+
+- Removing the resource from config will attempt to unload the module
+- The `Read` function checks if the module is loaded; if not, removes from state
+- Use with `openwrt_ipkg_package` to ensure kernel module packages are installed first
+
+---
+
 ## Import
 
 System resources can be imported using the config name and section name:
@@ -245,4 +327,8 @@ terraform import openwrt_dropbear.main main
 terraform import openwrt_uhttpd.main main
 terraform import openwrt_uhttpd_cert.defaults defaults
 terraform import openwrt_rpcd.main rpcd
+
+# Sys resources
+terraform import openwrt_sys_reboot.main sys_reboot
+terraform import openwrt_sys_modprobe.ath10k sys_modprobe/ath10k_pci
 ```
