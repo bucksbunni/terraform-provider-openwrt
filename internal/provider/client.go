@@ -337,7 +337,12 @@ func (c *JsonRpcClient) IPKGInstalled(ctx context.Context, pkg string) (bool, er
 	return ok, nil
 }
 
-func (c *JsonRpcClient) IPKGInstall(ctx context.Context, pkg string) error {
+func (c *JsonRpcClient) IPKGInstall(ctx context.Context, pkg string, update bool) error {
+	if update {
+		if err := c.IPKGUpdate(ctx); err != nil {
+			return fmt.Errorf("failed to update package lists: %w", err)
+		}
+	}
 	_, err := c.call(ctx, "ipkg", "install", pkg)
 	return err
 }

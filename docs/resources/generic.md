@@ -106,6 +106,7 @@ Manages package installation/removal via opkg.
 | `name` | String | Yes | Package name as known to opkg |
 | `autoremove` | Bool | No | Remove packages that were installed automatically to satisfy dependencies (default: true) |
 | `force_remove` | Bool | No | Remove package and all dependencies (default: true) |
+| `update` | Bool | No | Update package lists before installing (default: true) |
 
 ### Example
 
@@ -115,7 +116,7 @@ resource "openwrt_ipkg_package" "luci_mod_rpc" {
   name = "luci-mod-rpc"
 }
 
-# Install wireless driver (autoremove and force_remove default to true)
+# Install wireless driver (all flags default to true)
 resource "openwrt_ipkg_package" "ath10k" {
   name = "kmod-ath10k"
 }
@@ -125,6 +126,7 @@ resource "openwrt_ipkg_package" "ath10k_fw" {
   name         = "ath10k-firmware-qca988x"
   autoremove   = false
   force_remove = false
+  update       = false  # skip update if already done
 }
 
 # Install firewall utility

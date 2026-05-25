@@ -27,6 +27,7 @@ type ipkgPackageModel struct {
 	Name        types.String `tfsdk:"name"`
 	AutoRemove  types.Bool   `tfsdk:"autoremove"`
 	ForceRemove types.Bool   `tfsdk:"force_remove"`
+	Update      types.Bool   `tfsdk:"update"`
 }
 
 func (r *ipkgPackageResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -57,6 +58,12 @@ func (r *ipkgPackageResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Default:     booldefault.StaticBool(true),
 				Description: "Remove package and all dependencies.",
 			},
+			"update": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+				Description: "Update package lists before installing.",
+			},
 		},
 	}
 }
@@ -86,8 +93,9 @@ func (r *ipkgPackageResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	name := plan.Name.ValueString()
+	update := plan.Update.ValueBool()
 
-	if err := r.client.IPKGInstall(ctx, name); err != nil {
+	if err := r.client.IPKGInstall(ctx, name, update); err != nil {
 		resp.Diagnostics.AddError("Error installing package", err.Error())
 		return
 	}
