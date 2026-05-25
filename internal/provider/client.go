@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,9 +34,22 @@ type JsonRpcClient struct {
 
 	httpClient *http.Client
 
-	mu    sync.Mutex
+	// mu is a generic mutex for protecting shared state during RPC calls
+	mu sync.Mutex
+
+	// ipkgMu specifically protects IPKG operations to prevent race conditions
+	// when multiple resources check package installation status concurrently
+	ipkgMu sync.Mutex
+
+	// token is set once after login and used for all subsequent RPC calls.
+	// It is stable for the client lifetime, so passing via context would add
+	// boilerplate without benefit. Use CallWithToken() if per-call override needed.
 	token string
-	id    int64
+
+	// id is an incrementing counter for JSON-RPC request identification.
+	// It's an internal implementation detail; context should carry request-
+	// scoped concerns (cancellation, timeouts), not protocol bookkeeping.
+	id int64
 }
 
 // NewJsonRpcClient creates a new JSON-RPC client for communicating with OpenWrt's LuCI API.
@@ -333,16 +347,34 @@ func (c *JsonRpcClient) FSStat(ctx context.Context, path string) (map[string]int
 
 // IPKG
 
+// IPKGInstalled checks if a package is installed on the OpenWrt device.
+// Uses ipkg.info instead of ipkg.installed because the latter returns null
+// for some installed packages (particularly kernel modules like kmod-ath10k).
+// A mutex is used to prevent race conditions when multiple resources are
+// refreshing concurrently, which can cause inconsistent results.
 func (c *JsonRpcClient) IPKGInstalled(ctx context.Context, pkg string) (bool, error) {
-	raw, err := c.call(ctx, "ipkg", "installed", pkg)
+	c.ipkgMu.Lock()
+	defer c.ipkgMu.Unlock()
+
+	info, err := c.IPKGInfo(ctx, pkg)
 	if err != nil {
 		return false, err
 	}
-	var ok bool
-	if err := json.Unmarshal(raw, &ok); err != nil {
-		return false, fmt.Errorf("decode ipkg.installed: %w", err)
+	if info == nil {
+		return false, nil
 	}
-	return ok, nil
+	if pkgInfo, ok := info[pkg].(map[string]interface{}); ok {
+		// Status can be either a map (from map response) or string (from array response)
+		if status, ok := pkgInfo["Status"].(map[string]interface{}); ok {
+			if installed, ok := status["installed"].(bool); ok && installed {
+				return true, nil
+			}
+		}
+		if statusStr, ok := pkgInfo["Status"].(string); ok {
+			return strings.Contains(statusStr, "installed"), nil
+		}
+	}
+	return false, nil
 }
 
 func (c *JsonRpcClient) IPKGInstall(ctx context.Context, pkg string, update bool) error {
@@ -416,6 +448,11 @@ func (c *JsonRpcClient) IPKGFind(ctx context.Context, pattern string) ([]map[str
 
 // IPKGInfo returns information about installed and available packages.
 // If pkg is empty, info for all packages is returned.
+// The LuCI ipkg RPC can return responses in two formats depending on the
+// query: either a map {"PackageName": {...}} or an array [{...}, {...}.
+// This function handles both formats to ensure reliable package detection.
+// For kernel modules (e.g., kmod-ath10k), ipkg.installed returns null but
+// ipkg.info returns valid status information.
 func (c *JsonRpcClient) IPKGInfo(ctx context.Context, pkg string) (map[string]interface{}, error) {
 	params := []interface{}{}
 	if pkg != "" {
@@ -425,8 +462,25 @@ func (c *JsonRpcClient) IPKGInfo(ctx context.Context, pkg string) (map[string]in
 	if err != nil {
 		return nil, err
 	}
+	if string(raw) == "null" || string(raw) == "[]" {
+		return nil, nil
+	}
 	var result map[string]interface{}
+	// Handle both map and array response formats from the RPC
 	if err := json.Unmarshal(raw, &result); err != nil {
+		var resultArr []interface{}
+		if arrErr := json.Unmarshal(raw, &resultArr); arrErr == nil && len(resultArr) > 0 {
+			res := make(map[string]interface{})
+			for _, item := range resultArr {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					name, _ := itemMap["Package"].(string)
+					res[name] = itemMap
+				}
+			}
+			if len(res) > 0 {
+				return res, nil
+			}
+		}
 		return nil, fmt.Errorf("decode ipkg.info: %w", err)
 	}
 	return result, nil

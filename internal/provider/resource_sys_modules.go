@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -19,8 +20,12 @@ func NewSysModulesResource() resource.Resource {
 	return &sysModulesResource{}
 }
 
+// sysModulesResource manages kernel modules loaded at boot time via /etc/modules.d.
+// Uses a dedicated mutex (mu) to prevent race conditions during concurrent Read operations
+// when multiple resources refresh simultaneously, which can cause inconsistent module detection.
 type sysModulesResource struct {
 	client *JsonRpcClient
+	mu     sync.Mutex
 }
 
 type sysModulesModel struct {
@@ -84,7 +89,12 @@ func (r *sysModulesResource) Create(ctx context.Context, req resource.CreateRequ
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
+// Read checks the current state of kernel modules. Uses mutex to ensure
+// consistent reads when multiple resources refresh concurrently.
 func (r *sysModulesResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	var state sysModulesModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -155,6 +165,10 @@ func (r *sysModulesResource) ImportState(ctx context.Context, req resource.Impor
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), "sys_modules")...)
 }
 
+// readModulesFile reads kernel modules from a marker file in /etc/modules.d/.
+// The sys.exec RPC can return responses in two formats: JSON-wrapped {"msg": "..."}
+// or a plain string. This function handles both formats for reliable detection.
+// Uses marker file "zz-terraform-managed" to isolate Terraform-managed modules.
 func (r *sysModulesResource) readModulesFile(ctx context.Context) ([]string, error) {
 	modulesDir := "/etc/modules.d"
 	terraformMarker := "zz-terraform-managed"
@@ -165,16 +179,27 @@ func (r *sysModulesResource) readModulesFile(ctx context.Context) ([]string, err
 		return nil, err
 	}
 
+	// Handle JSON-wrapped response format: {"msg": "ath10k_pci\nath10k_core\n"}
 	var resultMap map[string]interface{}
-	if err := json.Unmarshal(result, &resultMap); err != nil {
-		return []string{}, nil
+	if err := json.Unmarshal(result, &resultMap); err == nil {
+		if msg, ok := resultMap["msg"].(string); ok {
+			return r.parseModulesFromOutput(msg), nil
+		}
 	}
 
-	msg, _ := resultMap["msg"].(string)
+	// Handle plain string response format: "ath10k_pci\nath10k_core\n"
+	var msg string
+	if err := json.Unmarshal(result, &msg); err == nil {
+		return r.parseModulesFromOutput(msg), nil
+	}
+
+	return []string{}, nil
+}
+
+func (r *sysModulesResource) parseModulesFromOutput(msg string) []string {
 	if msg == "" {
-		return []string{}, nil
+		return []string{}
 	}
-
 	var modules []string
 	lines := strings.Split(msg, "\n")
 	for _, line := range lines {
@@ -183,8 +208,7 @@ func (r *sysModulesResource) readModulesFile(ctx context.Context) ([]string, err
 			modules = append(modules, line)
 		}
 	}
-
-	return modules, nil
+	return modules
 }
 
 func (r *sysModulesResource) writeModulesFile(ctx context.Context, modules []string) error {
