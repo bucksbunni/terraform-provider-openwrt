@@ -104,6 +104,7 @@ Manages package installation/removal via opkg.
 |-----------|------|----------|-------------|
 | `id` | String | Computed | Internal ID (equals package name) |
 | `name` | String | Yes | Package name as known to opkg |
+| `autoremove` | Bool | No | Remove unused dependencies when package is removed (default: false) |
 
 ### Example
 
@@ -113,9 +114,10 @@ resource "openwrt_ipkg_package" "luci_mod_rpc" {
   name = "luci-mod-rpc"
 }
 
-# Install wireless driver
+# Install wireless driver with auto-removal of dependencies
 resource "openwrt_ipkg_package" "ath10k" {
-  name = "kmod-ath10k"
+  name       = "kmod-ath10k"
+  autoremove = true
 }
 
 # Install firewall utility

@@ -6,7 +6,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -22,8 +23,9 @@ type ipkgPackageResource struct {
 }
 
 type ipkgPackageModel struct {
-	ID   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"name"`
+	ID         types.String `tfsdk:"id"`
+	Name       types.String `tfsdk:"name"`
+	AutoRemove types.Bool   `tfsdk:"autoremove"`
 }
 
 func (r *ipkgPackageResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -31,16 +33,22 @@ func (r *ipkgPackageResource) Metadata(_ context.Context, req resource.MetadataR
 }
 
 func (r *ipkgPackageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = rschema.Schema{
+	resp.Schema = schema.Schema{
 		Description: "Manages an OpenWrt package via LuCI /rpc/ipkg.",
-		Attributes: map[string]rschema.Attribute{
-			"id": rschema.StringAttribute{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal ID, equal to package name.",
 			},
-			"name": rschema.StringAttribute{
+			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "Package name as known to opkg, e.g. 'luci-mod-rpc'.",
+			},
+			"autoremove": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Description: "Remove unused dependencies when package is removed.",
 			},
 		},
 	}
@@ -118,8 +126,9 @@ func (r *ipkgPackageResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	name := state.Name.ValueString()
+	autoremove := state.AutoRemove.ValueBool()
 
-	if err := r.client.IPKGRemove(ctx, name); err != nil {
+	if err := r.client.IPKGRemove(ctx, name, autoremove); err != nil {
 		resp.Diagnostics.AddError("Error removing package", err.Error())
 		return
 	}

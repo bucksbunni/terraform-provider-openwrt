@@ -62,7 +62,7 @@ func TestIPKGPackageResource_Schema(t *testing.T) {
 		t.Fatalf("expected correct description, got %q", s.Description)
 	}
 
-	expectedAttrs := []string{"id", "name"}
+	expectedAttrs := []string{"id", "name", "autoremove"}
 	for _, attr := range expectedAttrs {
 		if _, ok := s.Attributes[attr]; !ok {
 			t.Fatalf("expected %s attribute", attr)

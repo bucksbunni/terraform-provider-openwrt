@@ -342,7 +342,11 @@ func (c *JsonRpcClient) IPKGInstall(ctx context.Context, pkg string) error {
 	return err
 }
 
-func (c *JsonRpcClient) IPKGRemove(ctx context.Context, pkg string) error {
+func (c *JsonRpcClient) IPKGRemove(ctx context.Context, pkg string, autoremove bool) error {
+	if autoremove {
+		_, err := c.call(ctx, "ipkg", "remove", pkg, "--autoremove")
+		return err
+	}
 	_, err := c.call(ctx, "ipkg", "remove", pkg)
 	return err
 }
