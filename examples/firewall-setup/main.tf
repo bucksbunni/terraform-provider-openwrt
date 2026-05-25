@@ -30,7 +30,7 @@ resource "openwrt_firewall_zone" "lan" {
   output  = "ACCEPT"
   forward = "REJECT"
   masq    = false
-  network = "lan"
+  network = ["lan"]
 }
 
 resource "openwrt_firewall_zone" "wan" {
@@ -40,7 +40,7 @@ resource "openwrt_firewall_zone" "wan" {
   forward = "REJECT"
   masq    = true
   mtu_fix = true
-  network = "wan"
+  network = ["wan"]
 }
 
 resource "openwrt_firewall_zone" "guest" {
@@ -49,7 +49,7 @@ resource "openwrt_firewall_zone" "guest" {
   output  = "ACCEPT"
   forward = "REJECT"
   masq    = true
-  network = "guest"
+  network = ["guest"]
 }
 
 resource "openwrt_firewall_zone" "vpn" {
@@ -58,7 +58,7 @@ resource "openwrt_firewall_zone" "vpn" {
   output  = "REJECT"
   forward = "REJECT"
   masq    = false
-  network = "wg0"
+  network = ["wg0"]
 }
 
 resource "openwrt_firewall_forwarding" "lan_to_wan" {

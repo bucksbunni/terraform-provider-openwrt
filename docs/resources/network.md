@@ -19,13 +19,12 @@ Manages a network interface (LAN, WAN, guest, etc.).
 | `name` | String | Yes | Interface name (e.g., 'lan', 'wan', 'guest') |
 | `proto` | String | Yes | Protocol: 'static', 'dhcp', 'dhcpv6', 'pppoe', 'wireguard', 'qmi' |
 | `device` | String | No | Network device (e.g., 'eth0', 'br-lan', 'wg0') |
-| `ipaddr` | String | No | IPv4 address with prefix (e.g., '192.168.1.1/24') |
-| `netmask` | String | No | Netmask for static IP |
+| `ipaddr` | List(String) | No | IPv4 address(es) with prefix (e.g., ['192.168.1.1/24', '10.0.0.1/24']) |
 | `gateway` | String | No | Default gateway |
-| `dns` | String | No | DNS servers (space-separated) |
+| `dns` | List(String) | No | DNS servers (e.g., ['8.8.8.8', '1.1.1.1']) |
 | `metric` | Int64 | No | Interface metric |
 | `delegate` | Bool | No | Delegate IPv6 prefixes |
-| `ip6addr` | String | No | IPv6 address |
+| `ip6addr` | List(String) | No | IPv6 address(es) (e.g., ['fd00::1/64', '2001:db8::1/64']) |
 | `ip6prefix` | String | No | IPv6 prefix |
 | `ip6assign` | String | No | IPv6 assignment prefix |
 | `ip6gateway` | String | No | IPv6 gateway |
@@ -41,10 +40,21 @@ resource "openwrt_network_interface" "lan" {
   name    = "lan"
   proto   = "static"
   device  = "br-lan"
-  ipaddr  = "192.168.1.1/24"
+  ipaddr  = ["192.168.1.1/24"]
   gateway = "192.168.1.254"
-  dns     = "8.8.8.8 8.8.4.4"
+  dns     = ["8.8.8.8", "1.1.1.1"]
   metric  = 100
+  auto    = "1"
+}
+
+# Multi-IP interface
+resource "openwrt_network_interface" "guest" {
+  name    = "guest"
+  proto   = "static"
+  device  = "br-guest"
+  ipaddr  = ["10.10.20.1/24", "10.10.30.1/24"]
+  ip6addr = ["fd00:1::1/64", "fd00:2::1/64"]
+  dns     = ["1.1.1.1"]
   auto    = "1"
 }
 

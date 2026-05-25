@@ -26,7 +26,7 @@ type dhcpHostModel struct {
 	ID        types.String `tfsdk:"id"`
 	Name      types.String `tfsdk:"name"`
 	IP        types.String `tfsdk:"ip"`
-	MAC       types.String `tfsdk:"mac"`
+	MAC       types.List   `tfsdk:"mac"`
 	Leasetime types.String `tfsdk:"leasetime"`
 }
 
@@ -53,9 +53,10 @@ func (r *dhcpHostResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Required:    true,
 				Description: "IP address to assign (e.g., '192.168.1.100').",
 			},
-			"mac": schema.StringAttribute{
+			"mac": schema.ListAttribute{
 				Required:    true,
-				Description: "MAC address to match (e.g., '00:11:22:33:44:55').",
+				ElementType: types.StringType,
+				Description: "MAC addresses to match (e.g., ['00:11:22:33:44:55']).",
 			},
 			"leasetime": schema.StringAttribute{
 				Optional:    true,
@@ -85,7 +86,7 @@ func (r *dhcpHostResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	_, err := r.client.UCISection(ctx, "dhcp", "host", name, options)
 	if err != nil {
@@ -121,7 +122,7 @@ func (r *dhcpHostResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	r.optionsToModel(data, &state)
+	r.optionsToModel(ctx, data, &state)
 	state.ID = types.StringValue(fmt.Sprintf("dhcp/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -138,7 +139,7 @@ func (r *dhcpHostResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	if err := r.client.UCITSet(ctx, "dhcp", name, options); err != nil {
 		resp.Diagnostics.AddError("Error updating DHCP host", err.Error())
@@ -192,14 +193,16 @@ func (r *dhcpHostResource) ImportState(ctx context.Context, req resource.ImportS
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func (r *dhcpHostResource) modelToOptions(plan dhcpHostModel) map[string]interface{} {
+func (r *dhcpHostResource) modelToOptions(ctx context.Context, plan dhcpHostModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.IP.IsNull() {
 		options["ip"] = plan.IP.ValueString()
 	}
 	if !plan.MAC.IsNull() {
-		options["mac"] = plan.MAC.ValueString()
+		var macList []string
+		plan.MAC.ElementsAs(ctx, &macList, false)
+		options["mac"] = strings.Join(macList, " ")
 	}
 	if !plan.Leasetime.IsNull() {
 		options["leasetime"] = plan.Leasetime.ValueString()
@@ -208,15 +211,16 @@ func (r *dhcpHostResource) modelToOptions(plan dhcpHostModel) map[string]interfa
 	return options
 }
 
-func (r *dhcpHostResource) optionsToModel(data map[string]interface{}, state *dhcpHostModel) {
+func (r *dhcpHostResource) optionsToModel(ctx context.Context, data map[string]interface{}, state *dhcpHostModel) {
 	if v, ok := data["name"].(string); ok {
 		state.Name = types.StringValue(v)
 	}
 	if v, ok := data["ip"].(string); ok {
 		state.IP = types.StringValue(v)
 	}
-	if v, ok := data["mac"].(string); ok {
-		state.MAC = types.StringValue(v)
+	if v, ok := data["mac"].(string); ok && v != "" {
+		macList := strings.Split(v, " ")
+		state.MAC, _ = types.ListValueFrom(ctx, types.StringType, macList)
 	}
 	if v, ok := data["leasetime"].(string); ok {
 		state.Leasetime = types.StringValue(v)

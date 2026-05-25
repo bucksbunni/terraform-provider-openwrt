@@ -93,11 +93,11 @@ Manages wireless interfaces (SSIDs).
 | `ssid` | String | No | SSID name |
 | `encryption` | String | No | Encryption type: 'psk2', 'psk', 'wep', 'none' |
 | `key` | String | No | Encryption key/password |
-| `network` | String | No | Network to attach |
+| `network` | List(String) | No | Networks to attach (e.g., ['lan', 'guest']) |
 | `disabled` | Bool | No | Disable the interface |
 | `hidden` | Bool | No | Hide SSID |
 | `macfilter` | String | No | MAC filter: 'disable', 'allow', 'deny', 'radius' |
-| `maclist` | String | No | MAC address list |
+| `maclist` | List(String) | No | MAC address list (e.g., ['00:11:22:33:44:55']) |
 | `isolate` | Bool | No | Client isolation |
 
 ### Example
@@ -111,12 +111,12 @@ resource "openwrt_wireless_iface" "main" {
   ssid        = "MyNetwork"
   encryption  = "psk2"
   key         = "secretpassword"
-  network     = "lan"
+  network     = ["lan"]
   hidden      = false
   isolate     = false
 }
 
-# Guest Network
+# Multi-network and MAC filtering
 resource "openwrt_wireless_iface" "guest" {
   name        = "wifinet1"
   device      = "radio0"
@@ -124,7 +124,9 @@ resource "openwrt_wireless_iface" "guest" {
   ssid        = "GuestNetwork"
   encryption  = "psk2"
   key         = "guestpassword"
-  network     = "guest"
+  network     = ["guest", "iot"]
+  macfilter   = "allow"
+  maclist     = ["00:11:22:33:44:55", "AA:BB:CC:DD:EE:FF"]
   isolate     = true
 }
 ```

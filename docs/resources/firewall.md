@@ -22,7 +22,7 @@ Manages firewall zones.
 | `forward` | String | No | Forward policy: 'ACCEPT', 'REJECT', 'DROP' |
 | `masq` | Bool | No | Enable SNAT masquerading |
 | `masq6` | Bool | No | Enable IPv6 masquerading |
-| `network` | String | No | Networks assigned to zone |
+| `network` | List(String) | No | Networks assigned to zone (e.g., ['lan', 'guest']) |
 
 ### Example
 
@@ -33,7 +33,7 @@ resource "openwrt_firewall_zone" "lan" {
   output   = "ACCEPT"
   forward  = "REJECT"
   masq     = false
-  network  = "lan"
+  network  = ["lan"]
 }
 
 resource "openwrt_firewall_zone" "guest" {
@@ -42,7 +42,7 @@ resource "openwrt_firewall_zone" "guest" {
   output   = "ACCEPT"
   forward  = "REJECT"
   masq     = true
-  network  = "guest"
+  network  = ["guest", "iot"]
 }
 ```
 

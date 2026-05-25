@@ -103,7 +103,7 @@ Manages static DHCP host reservations.
 | `id` | String | Computed | Internal ID |
 | `name` | String | Yes | Host name |
 | `ip` | String | Yes | Reserved IP address |
-| `mac` | String | Yes | MAC address |
+| `mac` | List(String) | Yes | MAC addresses (e.g., ['00:11:22:33:44:55']) |
 | `leasetime` | String | No | Lease time override |
 | `dns` | Bool | No | Add to DNS |
 | `cloudflare` | Bool | No | Cloudflare DNS update |
@@ -115,14 +115,15 @@ Manages static DHCP host reservations.
 resource "openwrt_dhcp_host" "server" {
   name      = "fileserver"
   ip        = "192.168.1.100"
-  mac       = "00:11:22:33:44:55"
+  mac       = ["00:11:22:33:44:55"]
   leasetime = "infinite"
 }
 
+# Multiple MAC addresses for same IP
 resource "openwrt_dhcp_host" "printer" {
   name = "printer"
   ip   = "192.168.1.150"
-  mac  = "AA:BB:CC:DD:EE:FF"
+  mac  = ["AA:BB:CC:DD:EE:FF", "00:11:22:33:44:55"]
 }
 ```
 

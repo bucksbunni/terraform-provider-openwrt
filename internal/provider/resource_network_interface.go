@@ -28,13 +28,12 @@ type networkInterfaceModel struct {
 	Name        types.String `tfsdk:"name"`
 	Proto       types.String `tfsdk:"proto"`
 	Device      types.String `tfsdk:"device"`
-	IPAddr      types.String `tfsdk:"ipaddr"`
-	Netmask     types.String `tfsdk:"netmask"`
+	IPAddr      types.List   `tfsdk:"ipaddr"`
 	Gateway     types.String `tfsdk:"gateway"`
-	DNS         types.String `tfsdk:"dns"`
+	DNS         types.List   `tfsdk:"dns"`
 	Metric      types.Int64  `tfsdk:"metric"`
 	Delegate    types.Bool   `tfsdk:"delegate"`
-	IP6Addr     types.String `tfsdk:"ip6addr"`
+	IP6Addr     types.List   `tfsdk:"ip6addr"`
 	IP6Prefix   types.String `tfsdk:"ip6prefix"`
 	IP6Assign   types.String `tfsdk:"ip6assign"`
 	IP6Gateway  types.String `tfsdk:"ip6gateway"`
@@ -70,21 +69,19 @@ func (r *networkInterfaceResource) Schema(_ context.Context, _ resource.SchemaRe
 				Optional:    true,
 				Description: "Network device (e.g., 'eth0', 'br-lan', 'wg0').",
 			},
-			"ipaddr": schema.StringAttribute{
+			"ipaddr": schema.ListAttribute{
 				Optional:    true,
-				Description: "IPv4 address with prefix (e.g., '192.168.1.1/24').",
-			},
-			"netmask": schema.StringAttribute{
-				Optional:    true,
-				Description: "Netmask for static IP (e.g., '255.255.255.0').",
+				ElementType: types.StringType,
+				Description: "IPv4 address(es) with prefix (e.g., ['192.168.1.1/24', '10.0.0.1/24']).",
 			},
 			"gateway": schema.StringAttribute{
 				Optional:    true,
 				Description: "Default gateway IP address.",
 			},
-			"dns": schema.StringAttribute{
+			"dns": schema.ListAttribute{
 				Optional:    true,
-				Description: "DNS server(s), space-separated.",
+				ElementType: types.StringType,
+				Description: "DNS server(s) (e.g., ['8.8.8.8', '1.1.1.1']).",
 			},
 			"metric": schema.Int64Attribute{
 				Optional:    true,
@@ -94,9 +91,10 @@ func (r *networkInterfaceResource) Schema(_ context.Context, _ resource.SchemaRe
 				Optional:    true,
 				Description: "Enable IPv6 delegation (default: true).",
 			},
-			"ip6addr": schema.StringAttribute{
+			"ip6addr": schema.ListAttribute{
 				Optional:    true,
-				Description: "IPv6 address with prefix (e.g., 'fd00::1/64').",
+				ElementType: types.StringType,
+				Description: "IPv6 address(es) with prefix (e.g., ['fd00::1/64', '2001:db8::1/64']).",
 			},
 			"ip6prefix": schema.StringAttribute{
 				Optional:    true,
@@ -148,7 +146,7 @@ func (r *networkInterfaceResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	tflog.Debug(ctx, "Creating network interface", map[string]interface{}{"name": name})
 
@@ -205,7 +203,7 @@ func (r *networkInterfaceResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	r.optionsToModel(data, &state)
+	r.optionsToModel(ctx, data, &state)
 	state.ID = types.StringValue(fmt.Sprintf("network/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -222,7 +220,7 @@ func (r *networkInterfaceResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	ifaces, err := r.client.UCIForeach(ctx, "network", "interface")
 	if err != nil {
@@ -299,7 +297,7 @@ func (r *networkInterfaceResource) ImportState(ctx context.Context, req resource
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func (r *networkInterfaceResource) modelToOptions(plan networkInterfaceModel) map[string]interface{} {
+func (r *networkInterfaceResource) modelToOptions(ctx context.Context, plan networkInterfaceModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Proto.IsNull() {
@@ -309,16 +307,22 @@ func (r *networkInterfaceResource) modelToOptions(plan networkInterfaceModel) ma
 		options["device"] = plan.Device.ValueString()
 	}
 	if !plan.IPAddr.IsNull() {
-		options["ipaddr"] = plan.IPAddr.ValueString()
-	}
-	if !plan.Netmask.IsNull() {
-		options["netmask"] = plan.Netmask.ValueString()
+		var addrs []string
+		plan.IPAddr.ElementsAs(ctx, &addrs, false)
+		// Convert to []interface{} for UCI list directive
+		list := make([]interface{}, len(addrs))
+		for i, a := range addrs {
+			list[i] = a
+		}
+		options["ipaddr"] = list
 	}
 	if !plan.Gateway.IsNull() {
 		options["gateway"] = plan.Gateway.ValueString()
 	}
 	if !plan.DNS.IsNull() {
-		options["dns"] = plan.DNS.ValueString()
+		var dnsList []string
+		plan.DNS.ElementsAs(ctx, &dnsList, false)
+		options["dns"] = strings.Join(dnsList, " ")
 	}
 	if !plan.Metric.IsNull() {
 		options["metric"] = plan.Metric.ValueInt64()
@@ -331,7 +335,14 @@ func (r *networkInterfaceResource) modelToOptions(plan networkInterfaceModel) ma
 		}
 	}
 	if !plan.IP6Addr.IsNull() {
-		options["ip6addr"] = plan.IP6Addr.ValueString()
+		var addrs []string
+		plan.IP6Addr.ElementsAs(ctx, &addrs, false)
+		// Convert to []interface{} for UCI list directive
+		list := make([]interface{}, len(addrs))
+		for i, a := range addrs {
+			list[i] = a
+		}
+		options["ip6addr"] = list
 	}
 	if !plan.IP6Prefix.IsNull() {
 		options["ip6prefix"] = plan.IP6Prefix.ValueString()
@@ -359,24 +370,33 @@ func (r *networkInterfaceResource) modelToOptions(plan networkInterfaceModel) ma
 	return options
 }
 
-func (r *networkInterfaceResource) optionsToModel(data map[string]interface{}, state *networkInterfaceModel) {
+func (r *networkInterfaceResource) optionsToModel(ctx context.Context, data map[string]interface{}, state *networkInterfaceModel) {
 	if v, ok := data["proto"].(string); ok {
 		state.Proto = types.StringValue(v)
 	}
 	if v, ok := data["device"].(string); ok {
 		state.Device = types.StringValue(v)
 	}
-	if v, ok := data["ipaddr"].(string); ok {
-		state.IPAddr = types.StringValue(v)
-	}
-	if v, ok := data["netmask"].(string); ok {
-		state.Netmask = types.StringValue(v)
+	if v, ok := data["ipaddr"].([]interface{}); ok {
+		var addrs []string
+		for _, a := range v {
+			if s, ok := a.(string); ok {
+				addrs = append(addrs, s)
+			}
+		}
+		if len(addrs) > 0 {
+			state.IPAddr, _ = types.ListValueFrom(ctx, types.StringType, addrs)
+		}
+	} else if v, ok := data["ipaddr"].(string); ok && v != "" {
+		addrs := strings.Split(v, " ")
+		state.IPAddr, _ = types.ListValueFrom(ctx, types.StringType, addrs)
 	}
 	if v, ok := data["gateway"].(string); ok {
 		state.Gateway = types.StringValue(v)
 	}
-	if v, ok := data["dns"].(string); ok {
-		state.DNS = types.StringValue(v)
+	if v, ok := data["dns"].(string); ok && v != "" {
+		dnsList := strings.Split(v, " ")
+		state.DNS, _ = types.ListValueFrom(ctx, types.StringType, dnsList)
 	}
 	if v, ok := data["metric"]; ok {
 		if f, ok := v.(float64); ok {
@@ -386,8 +406,19 @@ func (r *networkInterfaceResource) optionsToModel(data map[string]interface{}, s
 	if v, ok := data["delegate"].(string); ok {
 		state.Delegate = types.BoolValue(v == "1" || v == "true")
 	}
-	if v, ok := data["ip6addr"].(string); ok {
-		state.IP6Addr = types.StringValue(v)
+	if v, ok := data["ip6addr"].([]interface{}); ok {
+		var addrs []string
+		for _, a := range v {
+			if s, ok := a.(string); ok {
+				addrs = append(addrs, s)
+			}
+		}
+		if len(addrs) > 0 {
+			state.IP6Addr, _ = types.ListValueFrom(ctx, types.StringType, addrs)
+		}
+	} else if v, ok := data["ip6addr"].(string); ok && v != "" {
+		addrs := strings.Split(v, " ")
+		state.IP6Addr, _ = types.ListValueFrom(ctx, types.StringType, addrs)
 	}
 	if v, ok := data["ip6prefix"].(string); ok {
 		state.IP6Prefix = types.StringValue(v)

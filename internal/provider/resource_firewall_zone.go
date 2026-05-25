@@ -32,7 +32,7 @@ type firewallZoneModel struct {
 	MasqSrc  types.String `tfsdk:"masq_src"`
 	MasqDest types.String `tfsdk:"masq_dest"`
 	MtuFix   types.Bool   `tfsdk:"mtu_fix"`
-	Network  types.String `tfsdk:"network"`
+	Network  types.List   `tfsdk:"network"`
 }
 
 func (r *firewallZoneResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -85,9 +85,10 @@ func (r *firewallZoneResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Description: "Enable MSS clamping for outgoing traffic.",
 			},
-			"network": schema.StringAttribute{
+			"network": schema.ListAttribute{
 				Optional:    true,
-				Description: "Network interface name belonging to this zone.",
+				ElementType: types.StringType,
+				Description: "Network interface names belonging to this zone (e.g., ['lan', 'guest']).",
 			},
 		},
 	}
@@ -113,7 +114,7 @@ func (r *firewallZoneResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	tflog.Debug(ctx, "Creating firewall zone", map[string]interface{}{"name": name, "options": options})
 
@@ -199,7 +200,7 @@ func (r *firewallZoneResource) Read(ctx context.Context, req resource.ReadReques
 
 	tflog.Debug(ctx, "Firewall zone data", map[string]interface{}{"data": data})
 
-	r.optionsToModel(data, &state)
+	r.optionsToModel(ctx, data, &state)
 	state.ID = types.StringValue(fmt.Sprintf("firewall/%s", name))
 
 	tflog.Debug(ctx, "Firewall zone state after read", map[string]interface{}{"name": state.Name.ValueString(), "input": state.Input.ValueString(), "output": state.Output.ValueString(), "forward": state.Forward.ValueString()})
@@ -218,7 +219,7 @@ func (r *firewallZoneResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	name := plan.Name.ValueString()
-	options := r.modelToOptions(plan)
+	options := r.modelToOptions(ctx, plan)
 
 	zones, err := r.client.UCIForeach(ctx, "firewall", "zone")
 	if err != nil {
@@ -311,7 +312,7 @@ func (r *firewallZoneResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func (r *firewallZoneResource) modelToOptions(plan firewallZoneModel) map[string]interface{} {
+func (r *firewallZoneResource) modelToOptions(ctx context.Context, plan firewallZoneModel) map[string]interface{} {
 	options := make(map[string]interface{})
 
 	if !plan.Input.IsNull() {
@@ -340,13 +341,15 @@ func (r *firewallZoneResource) modelToOptions(plan firewallZoneModel) map[string
 		}
 	}
 	if !plan.Network.IsNull() {
-		options["network"] = plan.Network.ValueString()
+		var networks []string
+		plan.Network.ElementsAs(ctx, &networks, false)
+		options["network"] = strings.Join(networks, " ")
 	}
 
 	return options
 }
 
-func (r *firewallZoneResource) optionsToModel(data map[string]interface{}, state *firewallZoneModel) {
+func (r *firewallZoneResource) optionsToModel(ctx context.Context, data map[string]interface{}, state *firewallZoneModel) {
 	if v, ok := data["name"].(string); ok {
 		state.Name = types.StringValue(v)
 	}
@@ -377,16 +380,8 @@ func (r *firewallZoneResource) optionsToModel(data map[string]interface{}, state
 	if v, ok := data["mtu_fix"].(string); ok {
 		state.MtuFix = types.BoolValue(v == "1" || v == "true")
 	}
-	if v, ok := data["network"]; ok {
-		switch arr := v.(type) {
-		case []interface{}:
-			if len(arr) > 0 {
-				if s, ok := arr[0].(string); ok {
-					state.Network = types.StringValue(s)
-				}
-			}
-		case string:
-			state.Network = types.StringValue(arr)
-		}
+	if v, ok := data["network"].(string); ok && v != "" {
+		networks := strings.Split(v, " ")
+		state.Network, _ = types.ListValueFrom(ctx, types.StringType, networks)
 	}
 }

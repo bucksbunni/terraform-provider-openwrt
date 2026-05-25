@@ -88,33 +88,33 @@ resource "openwrt_dhcp_pool" "guest_v6" {
 resource "openwrt_dhcp_host" "server_static" {
   name = "fileserver"
   ip   = "192.168.1.10"
-  mac  = "00:11:22:33:44:55"
+  mac  = ["00:11:22:33:44:55"]
 }
 
 resource "openwrt_dhcp_host" "printer" {
   name      = "printer"
   ip        = "192.168.1.20"
-  mac       = "AA:BB:CC:DD:EE:FF"
+  mac       = ["AA:BB:CC:DD:EE:FF"]
   leasetime = "infinite"
 }
 
 resource "openwrt_dhcp_host" "nas" {
   name = "nas"
   ip   = "192.168.1.30"
-  mac  = "11:22:33:44:55:66"
+  mac  = ["11:22:33:44:55:66"]
 }
 
 resource "openwrt_dhcp_host" "dev_machine" {
   name      = "dev-machine"
   ip        = "10.10.10.50"
-  mac       = "DE:AD:BE:EF:CA:FE"
+  mac       = ["DE:AD:BE:EF:CA:FE"]
   leasetime = "24h"
 }
 
 resource "openwrt_dhcp_host" "iot_camera" {
   name = "camera-1"
   ip   = "192.168.2.100"
-  mac  = "C0:FF:EE:C0:FF:EE"
+  mac  = ["C0:FF:EE:C0:FF:EE"]
 }
 
 output "lan_pool_id" {

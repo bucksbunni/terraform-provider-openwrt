@@ -215,7 +215,7 @@ func TestUCIGetAll_WithSection(t *testing.T) {
 		}
 		resp := rpcResponse{
 			ID:     req.ID,
-			Result: json.RawMessage(`{".type":"interface",".name":"lan","ifname":"eth0","proto":"static","ipaddr":"192.168.2.1","netmask":"255.255.255.0"}`),
+			Result: json.RawMessage(`{".type":"interface",".name":"lan","ifname":"eth0","proto":"static","ipaddr":"192.168.2.1/24"}`),
 			Error:  nil,
 		}
 		_ = json.NewEncoder(w).Encode(&resp)
