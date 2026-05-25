@@ -18,6 +18,8 @@ All notable changes to the terraform-provider-openwrt will be documented in this
 - Sys hostname data source (openwrt_sys_hostname)
 - Sys wireless data source (openwrt_sys_wireless)
 - Sys wireless info data source (openwrt_sys_wireless_info)
+- Sys reboot resource (openwrt_sys_reboot) - Triggers device reboot with optional delay and message
+- Sys modprobe resource (openwrt_sys_modprobe) - Loads/unloads kernel modules with optional parameters
 - Supports reading configuration from environment variables
 
 ### Fixed
