@@ -125,6 +125,17 @@ func (r *ipkgPackageResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	state.ID = types.StringValue(name)
+
+	if state.AutoRemove.IsNull() {
+		state.AutoRemove = types.BoolValue(true)
+	}
+	if state.ForceRemove.IsNull() {
+		state.ForceRemove = types.BoolValue(true)
+	}
+	if state.Update.IsNull() {
+		state.Update = types.BoolValue(true)
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
