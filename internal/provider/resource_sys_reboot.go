@@ -77,7 +77,6 @@ func (r *sysRebootResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	delay := plan.Delay.ValueInt64()
-	message := plan.Message.ValueString()
 
 	if delay > 0 {
 		tflog.Info(ctx, fmt.Sprintf("Waiting %d seconds before reboot...", delay))
@@ -85,7 +84,7 @@ func (r *sysRebootResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	tflog.Info(ctx, "Rebooting OpenWrt device...")
-	result, err := r.client.SysCall(ctx, "exec", fmt.Sprintf("/sbin/shutdown -r %s '%s'", "-t 1", message))
+	result, err := r.client.SysCall(ctx, "exec", "/sbin/reboot")
 	if err != nil {
 		resp.Diagnostics.AddError("Error triggering reboot", err.Error())
 		return
@@ -123,7 +122,6 @@ func (r *sysRebootResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	delay := plan.Delay.ValueInt64()
-	message := plan.Message.ValueString()
 
 	if delay > 0 {
 		tflog.Info(ctx, fmt.Sprintf("Waiting %d seconds before reboot...", delay))
@@ -132,7 +130,7 @@ func (r *sysRebootResource) Update(ctx context.Context, req resource.UpdateReque
 
 	tflog.Info(ctx, "Rebooting OpenWrt device...")
 
-	result, err := r.client.SysCall(ctx, "exec", fmt.Sprintf("/sbin/shutdown -r %s '%s'", "-t 1", message))
+	result, err := r.client.SysCall(ctx, "exec", "/sbin/reboot")
 	if err != nil {
 		resp.Diagnostics.AddError("Error triggering reboot", err.Error())
 		return
