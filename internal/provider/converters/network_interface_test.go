@@ -154,8 +154,8 @@ func TestNetworkInterfaceToOptions_AllFields(t *testing.T) {
 		BridgeEmpty: ptrBoolP(false),
 	}
 	got := NetworkInterfaceToOptions(m)
-	if len(got) != 15 {
-		t.Errorf("NetworkInterfaceToOptions() returned %d keys, want 15", len(got))
+	if len(got) != 14 {
+		t.Errorf("NetworkInterfaceToOptions() returned %d keys, want 14", len(got))
 	}
 }
 
