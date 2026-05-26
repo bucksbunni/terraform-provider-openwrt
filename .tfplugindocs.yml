@@ -1,0 +1,24 @@
+条文:
+  source: ./
+  header: ""
+
+rendering:
+  path: "docs"
+  templates:
+    - template: .
+  format: markdown
+
+provider:
+  name: OpenWrt
+  description: The OpenWrt provider manages OpenWrt devices via the LuCI JSON-RPC API.
+
+resources:
+  strip_prefix: resource_
+
+data_sources:
+  strip_prefix: data_
+
+content:
+  imports:
+    - "*"
+    - "**/*"
