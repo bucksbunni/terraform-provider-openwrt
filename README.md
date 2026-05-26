@@ -13,7 +13,7 @@ The upstream JSON‑RPC behaviour is documented in `JsonRpcHowTo.md` of the [LuC
 
 > **WARNING: All features are highly experimental!** Use in production at your own risk.
 
-Full documentation is available in the [docs](docs/index.md) directory. Ready-to-use configurations in [examples](examples/).
+Full documentation is available in the [docs](docs/index.md) directory. Ready-to-use configurations in [examples](examples/). The provider is available in the [Terraform Registry](https://registry.terraform.io/providers/bucksbunni/terraform-provider-openwrt).
 
 ## Requirements
 
