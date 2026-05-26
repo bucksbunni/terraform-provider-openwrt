@@ -1,5 +1,4 @@
 ---
-layout: ""
 page_title: "Wireless Setup Guide"
 description: |-
   Guide for setting up wireless on OpenWrt with the Terraform provider.
