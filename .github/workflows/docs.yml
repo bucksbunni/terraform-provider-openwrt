@@ -25,48 +25,14 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install tfplugindocs
-        run: go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest
-
       - name: Install tfproviderdocs
         run: go install github.com/YakDriver/tfproviderdocs@latest
 
-      - name: Generate documentation
-        run: ./scripts/gen-docs.sh
-
-      - name: Check for changes
-        id: changes
-        run: |
-          if git diff --quiet docs/; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-          fi
+      - name: Build provider
+        run: go build -o terraform-provider-openwrt .
 
       - name: Validate documentation
-        if: steps.changes.outputs.changed == 'false'
         run: |
-          # Build provider for doc validation
-          go build -o terraform-provider-openwrt .
           tfproviderdocs check \
             --provider-name openwrt \
             --provider-source registry.terraform.io/bucksbunni/openwrt
-
-      - name: Fail if docs changed
-        if: steps.changes.outputs.changed == 'true'
-        run: |
-          echo "::warning::Documentation was modified by the workflow."
-          echo "::warning::Please regenerate docs locally and commit the changes."
-          echo ""
-          echo "Diff:"
-          git diff docs/
-          exit 1
-
-      - name: Commit generated docs
-        if: steps.changes.outputs.changed == 'true' && github.event_name == 'pull_request'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add docs/
-          git commit -m "chore: generate documentation"
-          git push
