@@ -2,11 +2,11 @@
 
 All notable changes to the terraform-provider-openwrt will be documented in this file.
 
-## 0.1.0 (May 26, 2026)
+## 0.1.0 (May 27, 2026)
 
 Published to [Terraform Registry](https://registry.terraform.io/providers/bucksbunni/openwrt)
 
-### Added
+ADDED
 
 - Initial release
 - Network device resource (openwrt_network_device)
@@ -28,7 +28,7 @@ Published to [Terraform Registry](https://registry.terraform.io/providers/bucksb
 - Supports reading configuration from environment variables
 - ipkg_package resource: Added autoremove, force_remove, and update flags
 
-### Fixed
+FIXED
 
 - **wireless_interface**: Fixed Read function to use UCIForeach with `.name` matching instead of UCIGetAll
 - **wireless_device**: Fixed Update function to set ID before saving state (was causing "unknown ID" error)
@@ -42,7 +42,7 @@ Published to [Terraform Registry](https://registry.terraform.io/providers/bucksb
 - **network_bridge_vlan**: Fixed Read to match by device+vlan; Fixed Create to use anonymous sections for OpenWrt 24.10 compatibility; Fixed Delete to find section by device+vlan
 - **UCISetSection**: Fixed parameter format to use 3 separate params for the luci.model.uci.set() API
 
-### Verified Working
+VERIFIED WORKING
 
 - Network interface resources create properly named UCI sections (e.g., "guest", "iot") instead of anonymous sections (e.g., "cfg086d96")
 - Network interface Read correctly finds resources by section name
@@ -50,6 +50,6 @@ Published to [Terraform Registry](https://registry.terraform.io/providers/bucksb
 - **network_bridge_vlan**: Creates, reads, and deletes bridge VLANs on OpenWrt using anonymous sections (e.g., vlan30)
 - All unit tests pass
 
-### Notes
+NOTES
 
-- Live network interfaces (from `ip link`) may persist after UCI deletion due to OpenWrt network subsystem caching. Run `/etc/init.d/network reload` or reboot to fully remove stale interfaces.
+Live network interfaces (from `ip link`) may persist after UCI deletion due to OpenWrt network subsystem caching. Run `/etc/init.d/network reload` or reboot to fully remove stale interfaces.
