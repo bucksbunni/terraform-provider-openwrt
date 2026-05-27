@@ -12,8 +12,8 @@ on:
       - '.tfplugindocs.yml'
 
 jobs:
-  generate-docs:
-    name: Generate and Validate Docs
+  validate-docs:
+    name: Validate Docs
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
