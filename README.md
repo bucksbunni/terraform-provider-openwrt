@@ -13,7 +13,7 @@ The upstream JSON‑RPC behaviour is documented in `JsonRpcHowTo.md` of the [LuC
 
 > **WARNING: All features are highly experimental!** Use in production at your own risk.
 
-Full documentation is available in the [docs](docs/index.md) directory. Ready-to-use configurations in [examples](examples/). The provider is available in the [Terraform Registry](https://registry.terraform.io/providers/bucksbunni/terraform-provider-openwrt).
+Full documentation is available in the [docs](docs/index.md) directory. Ready-to-use configurations in [examples](examples/).
 
 ## Requirements
 
@@ -32,15 +32,7 @@ Ensure LuCI is reachable at something like:
 
 ## Installation
 
-Build the provider binary:
-
-```bash
-go build ./...
-```
-
-Place `terraform-provider-openwrt` in your Terraform plugin directory or use terraform init with `source = "bucksbunni/openwrt"` once this provider becomes available.
-
-## Provider configuration
+The provider is published on the [Terraform Registry](https://registry.terraform.io/providers/bucksbunni/openwrt). Add it to your Terraform configuration:
 
 ```hcl
 terraform {
@@ -51,7 +43,13 @@ terraform {
     }
   }
 }
+```
 
+Then run `terraform init` to download the provider.
+
+## Provider configuration
+
+```hcl
 provider "openwrt" {
   host     = "http://192.168.1.1"
   username = "root"

@@ -20,7 +20,7 @@ func main() {
 
 	ctx := context.Background()
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/bucksbunni/terraform-provider-openwrt",
+		Address: "registry.terraform.io/bucksbunni/openwrt",
 		Debug:   debug,
 	}
 	prv := provider.NewProvider(version)

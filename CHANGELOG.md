@@ -4,7 +4,7 @@ All notable changes to the terraform-provider-openwrt will be documented in this
 
 ## 0.1.0 (May 26, 2026)
 
-Published to [Terraform Registry](https://registry.terraform.io/providers/bucksbunni/terraform-provider-openwrt)
+Published to [Terraform Registry](https://registry.terraform.io/providers/bucksbunni/openwrt)
 
 ### Added
 
