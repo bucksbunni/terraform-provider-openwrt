@@ -77,4 +77,4 @@ resource "openwrt_network_interface" "lan" {
 
 ## License
 
-GNU GPLv3 - see [LICENSE](LICENSE) for details.
+This project is licensed under the Mozilla Public License 2.0 (MPL 2.0) - see [LICENSE](LICENSE) for details.
