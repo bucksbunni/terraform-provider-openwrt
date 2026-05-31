@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -59,6 +60,8 @@ func TestAccNetworkInterface_Update(t *testing.T) {
 }
 
 func TestAccNetworkDevice_basic(t *testing.T) {
+	RequireTestConfig(t)
+	bridgeName := GetBridgeDevice()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
 			PreCheck(t)
@@ -67,9 +70,9 @@ func TestAccNetworkDevice_basic(t *testing.T) {
 		CheckDestroy:             testAccCheckNetworkDeviceDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccNetworkDeviceConfigBasic("tf-acc-br", "br-lan"),
+				Config: testAccNetworkDeviceConfigBasic(bridgeName),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_network_device.test", "name", "tf-acc-br"),
+					resource.TestCheckResourceAttr("openwrt_network_device.test", "name", bridgeName),
 					resource.TestCheckResourceAttr("openwrt_network_device.test", "type", "bridge"),
 				),
 			},
@@ -167,7 +170,245 @@ resource "openwrt_network_interface" "test" {
 `
 }
 
-func testAccNetworkDeviceConfigBasic(name, device string) string {
+func TestAccNetworkBridgeVlan_basic(t *testing.T) {
+	RequireTestConfig(t)
+	bridgeDevice := GetVLANBridgeDevice()
+	ports := GetVLANTaggedPorts()
+	if len(ports) == 0 {
+		t.Skip("No tagged ports configured for VLAN tests")
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			PreCheck(t)
+		},
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckNetworkBridgeVlanDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNetworkBridgeVlanConfigBasic(bridgeDevice, 100, ports[0]),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "device", bridgeDevice),
+					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "vlan", "100"),
+				),
+			},
+			{
+				ResourceName:      "openwrt_network_bridge_vlan.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccNetworkBridgeVlan_Update(t *testing.T) {
+	RequireTestConfig(t)
+	bridgeDevice := GetVLANBridgeDevice()
+	ports := GetVLANTaggedPorts()
+	if len(ports) == 0 {
+		t.Skip("No tagged ports configured for VLAN tests")
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			PreCheck(t)
+		},
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckNetworkBridgeVlanDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNetworkBridgeVlanConfigBasic(bridgeDevice, 100, ports[0]),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "device", bridgeDevice),
+					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "vlan", "100"),
+				),
+			},
+			{
+				Config: testAccNetworkBridgeVlanConfigUpdate(bridgeDevice, 100, ports[0]),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "device", bridgeDevice),
+					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "vlan", "100"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccNetworkWireguard_basic(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			PreCheck(t)
+		},
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckNetworkWireguardDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNetworkWireguardConfigBasic("wg-test"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg-test"),
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "public_key", "test-public-key-12345"),
+				),
+			},
+			{
+				ResourceName:      "openwrt_network_wireguard.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccNetworkWireguard_Update(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			PreCheck(t)
+		},
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckNetworkWireguardDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNetworkWireguardConfigBasic("wg-test"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg-test"),
+				),
+			},
+			{
+				Config: testAccNetworkWireguardConfigUpdate("wg-test"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg-test"),
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "endpoint_host", "vpn.example.com"),
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "endpoint_port", "51820"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckNetworkBridgeVlanDestroyed(s *terraform.State) error {
+	client := GetTestProvider(&testing.T{})
+	if client == nil {
+		return nil
+	}
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "openwrt_network_bridge_vlan" {
+			continue
+		}
+
+		if rs.Primary.ID == "" {
+			continue
+		}
+
+		parts := splitImportID(rs.Primary.ID)
+		if len(parts) != 2 {
+			continue
+		}
+
+		data, err := client.UCIGetAll(context.Background(), "network", parts[1])
+		if err != nil {
+			return nil
+		}
+
+		if len(data) > 0 {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func testAccCheckNetworkWireguardDestroyed(s *terraform.State) error {
+	client := GetTestProvider(&testing.T{})
+	if client == nil {
+		return nil
+	}
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "openwrt_network_wireguard" {
+			continue
+		}
+
+		if rs.Primary.ID == "" {
+			continue
+		}
+
+		parts := splitImportID(rs.Primary.ID)
+		if len(parts) != 2 {
+			continue
+		}
+
+		data, err := client.UCIGetAll(context.Background(), parts[0], parts[1])
+		if err != nil {
+			return nil
+		}
+
+		if len(data) > 0 {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func testAccNetworkBridgeVlanConfigBasic(device string, vlan int, port string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_device" "bridge" {
+  name  = "` + device + `"
+  type  = "bridge"
+  ports = ["` + port + `"]
+}
+
+resource "openwrt_network_bridge_vlan" "test" {
+  device = openwrt_network_device.bridge.name
+  vlan   = ` + fmt.Sprintf("%d", vlan) + `
+  ports = {
+    ` + port + ` = "t"
+  }
+}
+`
+}
+
+func testAccNetworkBridgeVlanConfigUpdate(device string, vlan int, port string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_device" "bridge" {
+  name  = "` + device + `"
+  type  = "bridge"
+  ports = ["` + port + `"]
+}
+
+resource "openwrt_network_bridge_vlan" "test" {
+  device = openwrt_network_device.bridge.name
+  vlan   = ` + fmt.Sprintf("%d", vlan) + `
+  ports = {
+    ` + port + ` = "t"
+  }
+}
+`
+}
+
+func testAccNetworkWireguardConfigBasic(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_wireguard" "test" {
+  name       = "` + name + `"
+  public_key = "test-public-key-12345"
+  allowed_ips = ["10.0.0.2/32"]
+}
+`
+}
+
+func testAccNetworkWireguardConfigUpdate(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_wireguard" "test" {
+  name           = "` + name + `"
+  public_key     = "test-public-key-12345"
+  endpoint_host  = "vpn.example.com"
+  endpoint_port  = 51820
+  allowed_ips    = ["10.0.0.2/32", "192.168.200.0/24"]
+}
+`
+}
+
+func testAccNetworkDeviceConfigBasic(name string) string {
 	return ProviderConfig() + `
 resource "openwrt_network_device" "test" {
   name   = "` + name + `"

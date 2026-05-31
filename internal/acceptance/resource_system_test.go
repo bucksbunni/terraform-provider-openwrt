@@ -176,3 +176,103 @@ resource "openwrt_system_led" "test" {
 }
 `
 }
+
+func TestAccSystemNTP_basic(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			PreCheck(t)
+		},
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckSystemNTPDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSystemNTPConfigBasic(),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_system_ntp.test", "enabled", "true"),
+				),
+			},
+			{
+				ResourceName:      "openwrt_system_ntp.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccSystemNTP_Update(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			PreCheck(t)
+		},
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckSystemNTPDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSystemNTPConfigBasic(),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_system_ntp.test", "enabled", "true"),
+				),
+			},
+			{
+				Config: testAccSystemNTPConfigUpdate(),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_system_ntp.test", "enabled", "true"),
+					resource.TestCheckResourceAttr("openwrt_system_ntp.test", "server.#", "2"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckSystemNTPDestroyed(s *terraform.State) error {
+	client := GetTestProvider(&testing.T{})
+	if client == nil {
+		return nil
+	}
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "openwrt_system_ntp" {
+			continue
+		}
+
+		if rs.Primary.ID == "" {
+			continue
+		}
+
+		parts := splitImportID(rs.Primary.ID)
+		if len(parts) != 2 {
+			continue
+		}
+
+		data, err := client.UCIGetAll(context.Background(), parts[0], parts[1])
+		if err != nil {
+			return nil
+		}
+
+		if len(data) > 0 {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func testAccSystemNTPConfigBasic() string {
+	return ProviderConfig() + `
+resource "openwrt_system_ntp" "test" {
+  name    = "ntp"
+  enabled = true
+}
+`
+}
+
+func testAccSystemNTPConfigUpdate() string {
+	return ProviderConfig() + `
+resource "openwrt_system_ntp" "test" {
+  name    = "ntp"
+  enabled = true
+  server  = ["time.google.com", "time.cloudflare.com"]
+}
+`
+}

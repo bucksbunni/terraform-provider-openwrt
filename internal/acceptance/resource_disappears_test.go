@@ -49,6 +49,7 @@ func TestAccNetworkInterface_Disappears(t *testing.T) {
 }
 
 func TestAccDHCPPool_Disappears(t *testing.T) {
+	dhcpInterface := GetDHCPInterface()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
 			PreCheck(t)
@@ -57,9 +58,9 @@ func TestAccDHCPPool_Disappears(t *testing.T) {
 		CheckDestroy:             testAccCheckDHCPPoolDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDHCPPoolConfigBasic("tf-acc-disappear", "lan"),
+				Config: testAccDHCPPoolConfigBasic("tf-acc-disappear", dhcpInterface),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "interface", "lan"),
+					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "interface", dhcpInterface),
 					testAccCheckDHCPPoolDisappears("tf-acc-disappear"),
 				),
 				ExpectNonEmptyPlan: true,
