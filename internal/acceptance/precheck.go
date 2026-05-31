@@ -49,12 +49,6 @@ var requiredEnvVars = []string{
 	"OPENWRT_PASSWORD",
 }
 
-var optionalEnvVars = []string{
-	"OPENWRT_INSECURE",
-	"OPENWRT_SKIP_PRECHECK",
-	"OPENWRT_SKIP_CONNECTIVITY",
-}
-
 func PreCheck(t *testing.T) {
 	if os.Getenv("TF_ACC") == "" {
 		t.Skip("acceptance tests skipped unless TF_ACC=1 is set")
@@ -118,15 +112,6 @@ func GetTestPassword() string {
 
 func GetTestInsecure() bool {
 	return os.Getenv("OPENWRT_INSECURE") == "true"
-}
-
-func RandomWithPrefix(prefix string) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, 8)
-	for i := range b {
-		b[i] = letters[i%len(letters)]
-	}
-	return prefix + "-" + string(b)
 }
 
 func GetTestProvider(t *testing.T) *provider.JsonRpcClient {
