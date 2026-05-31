@@ -73,6 +73,10 @@ It validates that documentation is up-to-date. If docs drift is detected, the wo
 
 Releases are automated via GoReleaser. See `.goreleaser.yml` for configuration.
 
+## Commit Messages
+
+This project follows [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/); messages are validated in CI and drive the auto-generated release notes.
+
 ## Code Style
 
 - Follow standard Go conventions
