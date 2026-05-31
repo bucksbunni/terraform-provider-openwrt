@@ -259,10 +259,12 @@ func testAccCheckSystemNTPDestroyed(s *terraform.State) error {
 	return nil
 }
 
+// Tests use a dedicated timeserver name (not the default "ntp" section) so the
+// device's real NTP configuration is never modified or deleted.
 func testAccSystemNTPConfigBasic() string {
 	return ProviderConfig() + `
 resource "openwrt_system_ntp" "test" {
-  name    = "ntp"
+  name    = "tf_acc_ntp"
   enabled = true
 }
 `
@@ -271,7 +273,7 @@ resource "openwrt_system_ntp" "test" {
 func testAccSystemNTPConfigUpdate() string {
 	return ProviderConfig() + `
 resource "openwrt_system_ntp" "test" {
-  name    = "ntp"
+  name    = "tf_acc_ntp"
   enabled = true
   server  = ["time.google.com", "time.cloudflare.com"]
 }

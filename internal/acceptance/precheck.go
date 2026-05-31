@@ -98,6 +98,33 @@ func PreCheckWithConnectivity(t *testing.T) {
 	}
 }
 
+// RequireWireless skips the test unless the target device exposes at least one
+// mac80211 radio. Wireless resources need wireless packages and radio hardware,
+// which are absent on wired routers and minimal VMs.
+func RequireWireless(t *testing.T) {
+	if os.Getenv("TF_ACC") == "" {
+		return
+	}
+	client := GetTestProvider(t)
+	out, err := client.SysExec(t.Context(), "ls /sys/class/ieee80211 2>/dev/null")
+	if err != nil || strings.TrimSpace(out) == "" {
+		t.Skip("skipping wireless test: no mac80211 radio present on the device")
+	}
+}
+
+// RequireWireguard skips the test unless the WireGuard kernel module is loaded.
+// WireGuard resources require the kernel module and userspace tools.
+func RequireWireguard(t *testing.T) {
+	if os.Getenv("TF_ACC") == "" {
+		return
+	}
+	client := GetTestProvider(t)
+	out, err := client.SysExec(t.Context(), "[ -d /sys/module/wireguard ] && echo yes || true")
+	if err != nil || strings.TrimSpace(out) != "yes" {
+		t.Skip("skipping WireGuard test: the wireguard kernel module is not loaded")
+	}
+}
+
 func GetTestHost() string {
 	return os.Getenv("OPENWRT_HOST")
 }

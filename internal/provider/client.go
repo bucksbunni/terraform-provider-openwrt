@@ -267,6 +267,13 @@ func (c *JsonRpcClient) UCISection(ctx context.Context, config, typ, name string
 		return "", err
 	}
 
+	// A JSON null result means uci.section failed (e.g. an invalid section
+	// name: UCI section identifiers may only contain [a-zA-Z0-9_]). Surface it
+	// as an error instead of silently returning an empty section name.
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", fmt.Errorf("UCI section creation failed for %s.%s (invalid section name?)", config, name)
+	}
+
 	var secName string
 	if err := json.Unmarshal(raw, &secName); err != nil {
 		var boolResult bool
@@ -276,6 +283,9 @@ func (c *JsonRpcClient) UCISection(ctx context.Context, config, typ, name string
 		if boolResult {
 			return name, nil
 		}
+		return "", fmt.Errorf("UCI section creation failed for %s.%s", config, name)
+	}
+	if secName == "" {
 		return "", fmt.Errorf("UCI section creation failed for %s.%s", config, name)
 	}
 	return secName, nil
@@ -549,6 +559,24 @@ func (c *JsonRpcClient) SysCall(ctx context.Context, method string, params ...in
 	return c.call(ctx, "sys", method, params...)
 }
 
+// SysExec runs a shell command on the device via the sys.exec RPC and returns
+// its stdout. It is used to read information (e.g. /proc/net/*) that newer LuCI
+// releases no longer expose through dedicated luci.sys.net RPC methods.
+func (c *JsonRpcClient) SysExec(ctx context.Context, cmd string) (string, error) {
+	raw, err := c.SysCall(ctx, "exec", cmd)
+	if err != nil {
+		return "", err
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	var out string
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", fmt.Errorf("decode exec output: %w", err)
+	}
+	return out, nil
+}
+
 // Optional UCI calls
 
 // UCIAdd adds an anonymous section and returns its name.
@@ -657,6 +685,25 @@ func (c *JsonRpcClient) UCIForeach(ctx context.Context, config, typ string) ([]m
 		return nil, fmt.Errorf("decode UCI foreach: %w", err)
 	}
 	return result, nil
+}
+
+// UCIFindSectionID returns the UCI section identifier (the ".name" key, e.g.
+// "cfg0abc12") of the first section of the given type whose option equals value.
+// It returns "" if no section matches. This lets resources address anonymous
+// sections (created with UCIAdd) by a stable option such as "name".
+func (c *JsonRpcClient) UCIFindSectionID(ctx context.Context, config, typ, option, value string) (string, error) {
+	sections, err := c.UCIForeach(ctx, config, typ)
+	if err != nil {
+		return "", err
+	}
+	for _, s := range sections {
+		if v, ok := s[option].(string); ok && v == value {
+			if id, ok := s[".name"].(string); ok {
+				return id, nil
+			}
+		}
+	}
+	return "", nil
 }
 
 // UCIRename renames a section.

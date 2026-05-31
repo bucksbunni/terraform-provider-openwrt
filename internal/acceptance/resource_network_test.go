@@ -18,9 +18,9 @@ func TestAccNetworkInterface_basic(t *testing.T) {
 		CheckDestroy:             testAccCheckNetworkInterfaceDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccNetworkInterfaceConfigBasic("tf-acc-lan", "static"),
+				Config: testAccNetworkInterfaceConfigBasic("tf_acc_lan", "static"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf-acc-lan"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf_acc_lan"),
 					resource.TestCheckResourceAttr("openwrt_network_interface.test", "proto", "static"),
 				),
 			},
@@ -42,16 +42,16 @@ func TestAccNetworkInterface_Update(t *testing.T) {
 		CheckDestroy:             testAccCheckNetworkInterfaceDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccNetworkInterfaceConfigBasic("tf-acc-lan", "static"),
+				Config: testAccNetworkInterfaceConfigBasic("tf_acc_lan", "static"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf-acc-lan"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf_acc_lan"),
 					resource.TestCheckResourceAttr("openwrt_network_interface.test", "proto", "static"),
 				),
 			},
 			{
-				Config: testAccNetworkInterfaceConfigUpdate("tf-acc-lan"),
+				Config: testAccNetworkInterfaceConfigUpdate("tf_acc_lan"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf-acc-lan"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf_acc_lan"),
 					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ipaddr.0", "192.168.100.1/24"),
 				),
 			},
@@ -235,6 +235,7 @@ func TestAccNetworkBridgeVlan_Update(t *testing.T) {
 }
 
 func TestAccNetworkWireguard_basic(t *testing.T) {
+	RequireWireguard(t)
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
 			PreCheck(t)
@@ -259,6 +260,7 @@ func TestAccNetworkWireguard_basic(t *testing.T) {
 }
 
 func TestAccNetworkWireguard_Update(t *testing.T) {
+	RequireWireguard(t)
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
 			PreCheck(t)

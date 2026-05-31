@@ -222,24 +222,9 @@ func (r *networkInterfaceResource) Update(ctx context.Context, req resource.Upda
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
 
-	ifaces, err := r.client.UCIForeach(ctx, "network", "interface")
-	if err != nil {
-		resp.Diagnostics.AddError("Error reading network interfaces", err.Error())
-		return
-	}
-
-	var secName string
-	for _, iface := range ifaces {
-		if iface["name"] == name {
-			secName = iface[".name"].(string)
-			break
-		}
-	}
-
-	if secName == "" {
-		resp.Diagnostics.AddError("Error finding network interface", "interface not found")
-		return
-	}
+	// A network interface is a named UCI section whose identifier is the
+	// interface name itself, so address it directly.
+	secName := name
 
 	for key, value := range options {
 		if err := r.client.UCISet(ctx, "network", secName, key, value); err != nil {

@@ -37,10 +37,10 @@ func TestAccNetworkInterface_Disappears(t *testing.T) {
 		CheckDestroy:             testAccCheckNetworkInterfaceDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccNetworkInterfaceConfigBasic("tf-acc-disappear", "static"),
+				Config: testAccNetworkInterfaceConfigBasic("tf_acc_disappear", "static"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf-acc-disappear"),
-					testAccCheckResourceDisappears("network", "interface", "tf-acc-disappear"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf_acc_disappear"),
+					testAccCheckResourceDisappears("network", "interface", "tf_acc_disappear"),
 				),
 				ExpectNonEmptyPlan: true,
 			},
@@ -83,7 +83,10 @@ func testAccCheckResourceDisappears(config, sectionType, name string) resource.T
 
 		var secName string
 		for _, sec := range sections {
-			if sec["name"] == name {
+			// Match either the "name" option (anonymous sections such as
+			// firewall zones) or the section identifier itself (named sections
+			// such as network interfaces).
+			if sec["name"] == name || sec[".name"] == name {
 				secName = sec[".name"].(string)
 				break
 			}

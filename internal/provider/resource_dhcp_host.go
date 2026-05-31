@@ -88,10 +88,21 @@ func (r *dhcpHostResource) Create(ctx context.Context, req resource.CreateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
 
-	_, err := r.client.UCISection(ctx, "dhcp", "host", name, options)
+	// DHCP host reservations are anonymous UCI sections carrying a "name"
+	// option (the hostname, which may contain hyphens that are invalid in a UCI
+	// section identifier). Create an anonymous section and set "name" as an
+	// option rather than using it as the section identifier.
+	secName, err := r.client.UCIAdd(ctx, "dhcp", "host")
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating DHCP host", err.Error())
 		return
+	}
+	options["name"] = name
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "dhcp", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error setting DHCP host option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "dhcp"); err != nil {
@@ -116,7 +127,17 @@ func (r *dhcpHostResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "dhcp", name)
+	secID, err := r.client.UCIFindSectionID(ctx, "dhcp", "host", "name", name)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading DHCP hosts", err.Error())
+		return
+	}
+	if secID == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	data, err := r.client.UCIGetAll(ctx, "dhcp", secID)
 	if err != nil || len(data) == 0 {
 		resp.State.RemoveResource(ctx)
 		return
@@ -140,10 +161,23 @@ func (r *dhcpHostResource) Update(ctx context.Context, req resource.UpdateReques
 
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
+	options["name"] = name
 
-	if err := r.client.UCITSet(ctx, "dhcp", name, options); err != nil {
-		resp.Diagnostics.AddError("Error updating DHCP host", err.Error())
+	secID, err := r.client.UCIFindSectionID(ctx, "dhcp", "host", "name", name)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading DHCP hosts", err.Error())
 		return
+	}
+	if secID == "" {
+		resp.Diagnostics.AddError("Error finding DHCP host", "host not found")
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "dhcp", secID, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating DHCP host option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "dhcp"); err != nil {
@@ -153,6 +187,8 @@ func (r *dhcpHostResource) Update(ctx context.Context, req resource.UpdateReques
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("dhcp/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -166,7 +202,17 @@ func (r *dhcpHostResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	name := state.Name.ValueString()
 
-	if err := r.client.UCIDelete(ctx, "dhcp", name); err != nil {
+	secID, err := r.client.UCIFindSectionID(ctx, "dhcp", "host", "name", name)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading DHCP hosts", err.Error())
+		return
+	}
+	if secID == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	if err := r.client.UCIDelete(ctx, "dhcp", secID); err != nil {
 		resp.Diagnostics.AddError("Error deleting DHCP host", err.Error())
 		return
 	}

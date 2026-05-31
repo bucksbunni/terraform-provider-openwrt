@@ -11,6 +11,7 @@ import (
 
 func TestAccWirelessDevice_basic(t *testing.T) {
 	RequireTestConfig(t)
+	RequireWireless(t)
 	radio := GetWirelessRadio()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
@@ -37,6 +38,7 @@ func TestAccWirelessDevice_basic(t *testing.T) {
 
 func TestAccWirelessDevice_Update(t *testing.T) {
 	RequireTestConfig(t)
+	RequireWireless(t)
 	radio := GetWirelessRadio()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
@@ -64,6 +66,7 @@ func TestAccWirelessDevice_Update(t *testing.T) {
 
 func TestAccWirelessInterface_basic(t *testing.T) {
 	RequireTestConfig(t)
+	RequireWireless(t)
 	radio := GetWirelessRadio()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
@@ -90,6 +93,7 @@ func TestAccWirelessInterface_basic(t *testing.T) {
 
 func TestAccWirelessInterface_Update(t *testing.T) {
 	RequireTestConfig(t)
+	RequireWireless(t)
 	radio := GetWirelessRadio()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {

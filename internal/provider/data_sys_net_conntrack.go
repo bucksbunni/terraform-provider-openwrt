@@ -99,20 +99,22 @@ func (d *sysNetConntrackDataSource) Read(ctx context.Context, req datasource.Rea
 	entries := make([]sysNetConntrackEntryModel, 0, len(conntrackData))
 	for _, c := range conntrackData {
 		cm := sysNetConntrackEntryModel{}
-		if v, ok := c["proto"].(string); ok {
+		// luci.sys.net.conntrack() uses "layer4" for the protocol and "dst" for
+		// the destination address; ports are returned as strings.
+		if v, ok := c["layer4"].(string); ok {
 			cm.Proto = types.StringValue(v)
 		}
 		if v, ok := c["src"].(string); ok {
 			cm.SourceIP = types.StringValue(v)
 		}
-		if v, ok := c["sport"].(float64); ok {
-			cm.SourcePort = types.Int64Value(int64(v))
+		if v, ok := toInt64(c["sport"]); ok {
+			cm.SourcePort = types.Int64Value(v)
 		}
-		if v, ok := c["dest"].(string); ok {
+		if v, ok := c["dst"].(string); ok {
 			cm.DestIP = types.StringValue(v)
 		}
-		if v, ok := c["dport"].(float64); ok {
-			cm.DestPort = types.Int64Value(int64(v))
+		if v, ok := toInt64(c["dport"]); ok {
+			cm.DestPort = types.Int64Value(v)
 		}
 		if v, ok := c["state"].(string); ok {
 			cm.State = types.StringValue(v)

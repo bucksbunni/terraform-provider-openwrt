@@ -1,6 +1,7 @@
 package acceptance
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -50,7 +51,7 @@ func TestAccDataSourceSysNetDevices_basic(t *testing.T) {
 			{
 				Config: testAccDataSourceSysNetDevicesConfig(),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_devices.test", "devices"),
+					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_devices.test", "devices.#"),
 				),
 			},
 		},
@@ -67,7 +68,7 @@ func TestAccDataSourceSysNetRoutes_basic(t *testing.T) {
 			{
 				Config: testAccDataSourceSysNetRoutesConfig(),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_routes.test", "routes"),
+					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_routes.test", "routes.#"),
 				),
 			},
 		},
@@ -84,7 +85,7 @@ func TestAccDataSourceSysNetRoutes6_basic(t *testing.T) {
 			{
 				Config: testAccDataSourceSysNetRoutes6Config(),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_routes6.test", "routes"),
+					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_routes6.test", "routes.#"),
 				),
 			},
 		},
@@ -101,7 +102,7 @@ func TestAccDataSourceSysNetArpTable_basic(t *testing.T) {
 			{
 				Config: testAccDataSourceSysNetArpTableConfig(),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_arptable.test", "entries"),
+					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_arptable.test", "entries.#"),
 				),
 			},
 		},
@@ -118,7 +119,7 @@ func TestAccDataSourceSysNetConntrack_basic(t *testing.T) {
 			{
 				Config: testAccDataSourceSysNetConntrackConfig(),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_conntrack.test", "connections"),
+					resource.TestCheckResourceAttrSet("data.openwrt_sys_net_conntrack.test", "entries.#"),
 				),
 			},
 		},
@@ -135,7 +136,7 @@ func TestAccDataSourceSysProcessList_basic(t *testing.T) {
 			{
 				Config: testAccDataSourceSysProcessListConfig(),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.openwrt_sys_process_list.test", "processes"),
+					resource.TestCheckResourceAttrSet("data.openwrt_sys_process_list.test", "processes.#"),
 				),
 			},
 		},
@@ -143,6 +144,13 @@ func TestAccDataSourceSysProcessList_basic(t *testing.T) {
 }
 
 func TestAccDataSourceSysWireless_basic(t *testing.T) {
+	// This data source queries iwinfo for a specific wireless interface, which
+	// requires wireless packages (iwinfo) and a radio. Provide a real interface
+	// name via OPENWRT_WIRELESS_IFNAME to run it; otherwise skip.
+	ifname := os.Getenv("OPENWRT_WIRELESS_IFNAME")
+	if ifname == "" {
+		t.Skip("skipping wireless data source test: set OPENWRT_WIRELESS_IFNAME to a wireless interface (e.g. wlan0)")
+	}
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
 			PreCheckWithConnectivity(t)
@@ -150,9 +158,9 @@ func TestAccDataSourceSysWireless_basic(t *testing.T) {
 		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceSysWirelessConfig(),
+				Config: testAccDataSourceSysWirelessConfig(ifname),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.openwrt_sys_wireless.test", "wireless"),
+					resource.TestCheckResourceAttr("data.openwrt_sys_wireless.test", "ifname", ifname),
 				),
 			},
 		},
@@ -169,7 +177,7 @@ func TestAccDataSourceSysRPC_basic(t *testing.T) {
 			{
 				Config: testAccDataSourceSysRPCConfig(),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.openwrt_sys_rpc.test", "result"),
+					resource.TestCheckResourceAttrSet("data.openwrt_sys_rpc.test", "result_json"),
 				),
 			},
 		},
@@ -224,16 +232,18 @@ data "openwrt_sys_process_list" "test" {}
 `
 }
 
-func testAccDataSourceSysWirelessConfig() string {
+func testAccDataSourceSysWirelessConfig(ifname string) string {
 	return ProviderConfig() + `
-data "openwrt_sys_wireless" "test" {}
+data "openwrt_sys_wireless" "test" {
+  ifname = "` + ifname + `"
+}
 `
 }
 
 func testAccDataSourceSysRPCConfig() string {
 	return ProviderConfig() + `
 data "openwrt_sys_rpc" "test" {
-  method = "sys.sysinfo"
+  method = "net.devices"
 }
 `
 }
