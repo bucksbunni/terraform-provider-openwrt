@@ -2,6 +2,11 @@
 
 All notable changes to the terraform-provider-openwrt will be documented in this file.
 
+> Release notes for versions after 0.1.0 are generated automatically from
+> [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) by GoReleaser
+> and published on the
+> [GitHub Releases](https://github.com/bucksbunni/terraform-provider-openwrt/releases) page.
+
 ## 0.1.0 (May 28, 2026)
 
 Published to [Terraform Registry](https://registry.terraform.io/providers/bucksbunni/openwrt)

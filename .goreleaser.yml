@@ -53,4 +53,29 @@ release:
     - glob: 'terraform-registry-manifest.json'
       name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
 changelog:
-  disable: true
+  # Build release notes from the git log, grouped by Conventional Commit type.
+  use: git
+  sort: asc
+  abbrev: -1
+  filters:
+    exclude:
+      - '^docs(\(.+\))?:'
+      - '^test(\(.+\))?:'
+      - '^ci(\(.+\))?:'
+      - '^build(\(.+\))?:'
+      - '^chore(\(.+\))?:'
+      - '^style(\(.+\))?:'
+      - '^refactor(\(.+\))?:'
+      - '^Merge '
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Performance improvements
+      regexp: '^.*?perf(\(.+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
