@@ -111,7 +111,7 @@ func testAccCheckNetworkInterfaceDestroyed(s *terraform.State) error {
 		}
 
 		if len(data) > 0 {
-			return nil
+			return fmt.Errorf("%s %q still exists after destroy", rs.Type, parts[1])
 		}
 	}
 
@@ -144,7 +144,7 @@ func testAccCheckNetworkDeviceDestroyed(s *terraform.State) error {
 		}
 
 		if len(data) > 0 {
-			return nil
+			return fmt.Errorf("%s %q still exists after destroy", rs.Type, parts[1])
 		}
 	}
 
@@ -310,7 +310,7 @@ func testAccCheckNetworkBridgeVlanDestroyed(s *terraform.State) error {
 		}
 
 		if len(data) > 0 {
-			return nil
+			return fmt.Errorf("%s %q still exists after destroy", rs.Type, parts[1])
 		}
 	}
 
@@ -343,7 +343,7 @@ func testAccCheckNetworkWireguardDestroyed(s *terraform.State) error {
 		}
 
 		if len(data) > 0 {
-			return nil
+			return fmt.Errorf("%s %q still exists after destroy", rs.Type, parts[1])
 		}
 	}
 

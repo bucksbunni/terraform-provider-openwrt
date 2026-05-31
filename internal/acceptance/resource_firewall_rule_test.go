@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -85,7 +86,7 @@ func testAccCheckFirewallRuleDestroyed(s *terraform.State) error {
 		}
 
 		if len(data) > 0 {
-			return nil
+			return fmt.Errorf("%s %q still exists after destroy", rs.Type, parts[1])
 		}
 	}
 
@@ -165,7 +166,7 @@ func testAccCheckFirewallForwardingDestroyed(s *terraform.State) error {
 		}
 
 		if len(data) > 0 {
-			return nil
+			return fmt.Errorf("%s %q still exists after destroy", rs.Type, parts[1])
 		}
 	}
 
