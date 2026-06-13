@@ -2,3 +2,7 @@
 /terraform-provider-openwrt
 /internal/acceptance/testconfig.yaml
 /testinfra/build/
+/testinfra/.terraform/
+/testinfra/terraform.tfstate
+/testinfra/terraform.tfstate.backup
+/testinfra/*.tfplan

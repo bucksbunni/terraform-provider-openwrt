@@ -15,7 +15,7 @@ set -euo pipefail
 OPENWRT_VERSION="24.10.2"
 IMAGEBUILDER_IMAGE="docker.io/openwrt/imagebuilder:x86-64-${OPENWRT_VERSION}"
 
-PACKAGES="luci-mod-rpc luci-lib-ipkg luci-compat kmod-wireguard wireguard-tools kmod-mac80211-hwsim wpad-mbedtls wireless-tools"
+PACKAGES="luci-mod-rpc luci-lib-ipkg luci-compat uhttpd luci-theme-bootstrap kmod-wireguard wireguard-tools kmod-mac80211-hwsim wpad-mbedtls wireless-tools"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/build"
