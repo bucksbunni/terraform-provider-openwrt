@@ -1,3 +1,4 @@
 *.swp
 /terraform-provider-openwrt
 /internal/acceptance/testconfig.yaml
+/testinfra/build/
