@@ -49,12 +49,6 @@ var requiredEnvVars = []string{
 	"OPENWRT_PASSWORD",
 }
 
-var optionalEnvVars = []string{
-	"OPENWRT_INSECURE",
-	"OPENWRT_SKIP_PRECHECK",
-	"OPENWRT_SKIP_CONNECTIVITY",
-}
-
 func PreCheck(t *testing.T) {
 	if os.Getenv("TF_ACC") == "" {
 		t.Skip("acceptance tests skipped unless TF_ACC=1 is set")
@@ -104,6 +98,33 @@ func PreCheckWithConnectivity(t *testing.T) {
 	}
 }
 
+// RequireWireless skips the test unless the target device exposes at least one
+// mac80211 radio. Wireless resources need wireless packages and radio hardware,
+// which are absent on wired routers and minimal VMs.
+func RequireWireless(t *testing.T) {
+	if os.Getenv("TF_ACC") == "" {
+		return
+	}
+	client := GetTestProvider(t)
+	out, err := client.SysExec(t.Context(), "ls /sys/class/ieee80211 2>/dev/null")
+	if err != nil || strings.TrimSpace(out) == "" {
+		t.Skip("skipping wireless test: no mac80211 radio present on the device")
+	}
+}
+
+// RequireWireguard skips the test unless the WireGuard kernel module is loaded.
+// WireGuard resources require the kernel module and userspace tools.
+func RequireWireguard(t *testing.T) {
+	if os.Getenv("TF_ACC") == "" {
+		return
+	}
+	client := GetTestProvider(t)
+	out, err := client.SysExec(t.Context(), "[ -d /sys/module/wireguard ] && echo yes || true")
+	if err != nil || strings.TrimSpace(out) != "yes" {
+		t.Skip("skipping WireGuard test: the wireguard kernel module is not loaded")
+	}
+}
+
 func GetTestHost() string {
 	return os.Getenv("OPENWRT_HOST")
 }
@@ -118,15 +139,6 @@ func GetTestPassword() string {
 
 func GetTestInsecure() bool {
 	return os.Getenv("OPENWRT_INSECURE") == "true"
-}
-
-func RandomWithPrefix(prefix string) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, 8)
-	for i := range b {
-		b[i] = letters[i%len(letters)]
-	}
-	return prefix + "-" + string(b)
 }
 
 func GetTestProvider(t *testing.T) *provider.JsonRpcClient {

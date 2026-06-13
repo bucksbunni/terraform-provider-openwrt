@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -125,7 +126,9 @@ func (r *networkBridgeVlanResource) Create(ctx context.Context, req resource.Cre
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
-	plan.ID = types.StringValue(fmt.Sprintf("network/%s", sectionName))
+	// Identify the bridge-vlan logically by device+vlan (the section itself is
+	// anonymous), so the ID is stable and importable.
+	plan.ID = types.StringValue(fmt.Sprintf("network/%s_%d", device, vlan))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -162,7 +165,7 @@ func (r *networkBridgeVlanResource) Read(ctx context.Context, req resource.ReadR
 	}
 
 	r.optionsToModel(data, &state)
-	state.ID = types.StringValue(fmt.Sprintf("network/%s", data[".name"]))
+	state.ID = types.StringValue(fmt.Sprintf("network/%s_%d", device, vlan))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -179,13 +182,33 @@ func (r *networkBridgeVlanResource) Update(ctx context.Context, req resource.Upd
 
 	device := plan.Device.ValueString()
 	vlan := plan.VLAN.ValueInt64()
-	vlanName := fmt.Sprintf("%s_%d", device, vlan)
+
+	// The bridge-vlan section is anonymous, so locate it by device+vlan.
+	vlans, err := r.client.UCIForeach(ctx, "network", "bridge-vlan")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading bridge VLANs", err.Error())
+		return
+	}
+	var sectionName string
+	for _, v := range vlans {
+		dev, _ := v["device"].(string)
+		vlanNum, _ := v["vlan"].(string)
+		if dev == device && vlanNum == fmt.Sprintf("%d", vlan) {
+			sectionName, _ = v[".name"].(string)
+			break
+		}
+	}
+	if sectionName == "" {
+		resp.Diagnostics.AddError("Error updating bridge VLAN", "section not found")
+		return
+	}
 
 	options := r.modelToOptions(ctx, plan)
-
-	if err := r.client.UCITSet(ctx, "network", vlanName, options); err != nil {
-		resp.Diagnostics.AddError("Error updating bridge VLAN", err.Error())
-		return
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "network", sectionName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating bridge VLAN option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "network"); err != nil {
@@ -195,6 +218,8 @@ func (r *networkBridgeVlanResource) Update(ctx context.Context, req resource.Upd
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("network/%s_%d", device, vlan))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -254,14 +279,22 @@ func (r *networkBridgeVlanResource) ImportState(ctx context.Context, req resourc
 		return
 	}
 
-	vlanParts := strings.SplitN(parts[1], "_", 2)
-	if len(vlanParts) != 2 {
+	// Split on the LAST underscore so device names containing underscores are
+	// preserved (the vlan id is always numeric).
+	idx := strings.LastIndex(parts[1], "_")
+	if idx <= 0 || idx == len(parts[1])-1 {
 		resp.Diagnostics.AddError("Invalid import ID", "Expected format: network/<device>_<vlan>")
 		return
 	}
+	device := parts[1][:idx]
+	vlan, err := strconv.ParseInt(parts[1][idx+1:], 10, 64)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid import ID", "vlan must be an integer: network/<device>_<vlan>")
+		return
+	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("device"), vlanParts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("vlan"), vlanParts[1])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("device"), device)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("vlan"), vlan)...)
 }
 
 func (r *networkBridgeVlanResource) modelToOptions(ctx context.Context, plan networkBridgeVlanModel) map[string]interface{} {

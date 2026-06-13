@@ -2,7 +2,8 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -88,46 +89,33 @@ func (d *sysNetRoutes6DataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	raw, err := d.client.SysCall(ctx, "net.routes6")
+	// luci.sys.net.routes6() was removed in modern LuCI, so read the kernel
+	// IPv6 routing table directly. /proc/net/ipv6_route columns:
+	//   dest_net dest_plen src_net src_plen next_hop metric refcnt use flags iface
+	// All addresses/counters are hex; addresses are 32 hex characters.
+	out, err := d.client.SysExec(ctx, "cat /proc/net/ipv6_route")
 	if err != nil {
 		resp.Diagnostics.AddError("Error calling /rpc/sys", err.Error())
 		return
 	}
 
-	var routesData []map[string]interface{}
-	if err := json.Unmarshal(raw, &routesData); err != nil {
-		resp.Diagnostics.AddError("Error parsing response", err.Error())
-		return
-	}
-
-	routes := make([]sysNetRoute6Model, 0, len(routesData))
-	for _, r := range routesData {
-		rm := sysNetRoute6Model{}
-		if v, ok := r["source"].(string); ok {
-			rm.Source = types.StringValue(v)
+	lines := nonHeaderLines(out, 0)
+	routes := make([]sysNetRoute6Model, 0, len(lines))
+	for _, line := range lines {
+		f := strings.Fields(line)
+		if len(f) < 10 {
+			continue
 		}
-		if v, ok := r["dest"].(string); ok {
-			rm.Dest = types.StringValue(v)
-		}
-		if v, ok := r["nexthop"].(string); ok {
-			rm.Nexthop = types.StringValue(v)
-		}
-		if v, ok := r["metric"].(float64); ok {
-			rm.Metric = types.Int64Value(int64(v))
-		}
-		if v, ok := r["refcount"].(float64); ok {
-			rm.RefCount = types.Int64Value(int64(v))
-		}
-		if v, ok := r["usecount"].(float64); ok {
-			rm.UseCount = types.Int64Value(int64(v))
-		}
-		if v, ok := r["flags"].(string); ok {
-			rm.Flags = types.StringValue(v)
-		}
-		if v, ok := r["device"].(string); ok {
-			rm.Device = types.StringValue(v)
-		}
-		routes = append(routes, rm)
+		routes = append(routes, sysNetRoute6Model{
+			Source:   types.StringValue(hexToIPv6(f[2]) + "/" + strconv.FormatInt(hexToInt(f[3]), 10)),
+			Dest:     types.StringValue(hexToIPv6(f[0]) + "/" + strconv.FormatInt(hexToInt(f[1]), 10)),
+			Nexthop:  types.StringValue(hexToIPv6(f[4])),
+			Metric:   types.Int64Value(hexToInt(f[5])),
+			RefCount: types.Int64Value(hexToInt(f[6])),
+			UseCount: types.Int64Value(hexToInt(f[7])),
+			Flags:    types.StringValue(f[8]),
+			Device:   types.StringValue(f[9]),
+		})
 	}
 
 	routesList, diags := types.ListValueFrom(ctx, types.ObjectType{

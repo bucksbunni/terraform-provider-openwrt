@@ -70,7 +70,8 @@ func (d *sysUptimeDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	var uptime string
+	// luci.sys.uptime() returns a number of seconds, not a string.
+	var uptime json.Number
 	if err := json.Unmarshal(raw, &uptime); err != nil {
 		resp.Diagnostics.AddError("Error parsing response", err.Error())
 		return
@@ -78,7 +79,7 @@ func (d *sysUptimeDataSource) Read(ctx context.Context, req datasource.ReadReque
 
 	state := sysUptimeModel{
 		ID:     types.StringValue("uptime"),
-		Uptime: types.StringValue(uptime),
+		Uptime: types.StringValue(uptime.String()),
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)

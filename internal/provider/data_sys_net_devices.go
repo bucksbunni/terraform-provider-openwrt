@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -92,52 +92,36 @@ func (d *sysNetDevicesDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	raw, err := d.client.SysCall(ctx, "net.deviceinfo")
+	// luci.sys.net.deviceinfo() was removed in modern LuCI. Gather per-device
+	// details from sysfs and /proc/net/dev instead. Each output line is:
+	//   name|mtu|macaddr|operstate|rx_bytes|rx_packets|tx_bytes|tx_packets
+	const cmd = `for p in /sys/class/net/*; do n=${p##*/}; s=$(sed -n "s/^[ ]*$n://p" /proc/net/dev); set -- $s; echo "$n|$(cat $p/mtu 2>/dev/null)|$(cat $p/address 2>/dev/null)|$(cat $p/operstate 2>/dev/null)|$1|$2|$9|${10}"; done`
+
+	out, err := d.client.SysExec(ctx, cmd)
 	if err != nil {
 		resp.Diagnostics.AddError("Error calling /rpc/sys", err.Error())
 		return
 	}
 
-	var deviceInfo []map[string]interface{}
-	if err := json.Unmarshal(raw, &deviceInfo); err != nil {
-		resp.Diagnostics.AddError("Error parsing response", err.Error())
-		return
-	}
-
-	devices := make([]sysNetDeviceModel, 0, len(deviceInfo))
-	for _, dev := range deviceInfo {
-		dm := sysNetDeviceModel{}
-		if v, ok := dev["name"].(string); ok {
-			dm.Name = types.StringValue(v)
+	lines := nonHeaderLines(out, 0)
+	devices := make([]sysNetDeviceModel, 0, len(lines))
+	for _, line := range lines {
+		f := strings.Split(line, "|")
+		if len(f) < 8 {
+			continue
 		}
-		if v, ok := dev["mtu"].(float64); ok {
-			dm.MTU = types.Int64Value(int64(v))
-		}
-		if v, ok := dev["macaddr"].(string); ok {
-			dm.MACAddr = types.StringValue(v)
-		}
-		if v, ok := dev["ipaddr"].(string); ok {
-			dm.IPAddr = types.StringValue(v)
-		}
-		if v, ok := dev["ip6addr"].(string); ok {
-			dm.IP6Addr = types.StringValue(v)
-		}
-		if v, ok := dev["rx_bytes"].(float64); ok {
-			dm.RXBytes = types.Int64Value(int64(v))
-		}
-		if v, ok := dev["tx_bytes"].(float64); ok {
-			dm.TXBytes = types.Int64Value(int64(v))
-		}
-		if v, ok := dev["rx_packets"].(float64); ok {
-			dm.RXPackets = types.Int64Value(int64(v))
-		}
-		if v, ok := dev["tx_packets"].(float64); ok {
-			dm.TXPackets = types.Int64Value(int64(v))
-		}
-		if v, ok := dev["flags"].(string); ok {
-			dm.Flags = types.StringValue(v)
-		}
-		devices = append(devices, dm)
+		devices = append(devices, sysNetDeviceModel{
+			Name:      types.StringValue(f[0]),
+			MTU:       types.Int64Value(atoiSafe(f[1])),
+			MACAddr:   types.StringValue(f[2]),
+			Flags:     types.StringValue(f[3]),
+			IPAddr:    types.StringValue(""),
+			IP6Addr:   types.StringValue(""),
+			RXBytes:   types.Int64Value(atoiSafe(f[4])),
+			RXPackets: types.Int64Value(atoiSafe(f[5])),
+			TXBytes:   types.Int64Value(atoiSafe(f[6])),
+			TXPackets: types.Int64Value(atoiSafe(f[7])),
+		})
 	}
 
 	devicesList, diags := types.ListValueFrom(ctx, types.ObjectType{

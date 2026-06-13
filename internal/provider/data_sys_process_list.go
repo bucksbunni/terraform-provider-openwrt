@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -21,11 +22,12 @@ type sysProcessListDataSource struct {
 type sysProcessModel struct {
 	PID     types.Int64  `tfsdk:"pid"`
 	PPID    types.Int64  `tfsdk:"ppid"`
-	PGID    types.Int64  `tfsdk:"pgid"`
-	Name    types.String `tfsdk:"name"`
-	URandom types.String `tfsdk:"urandom"`
-	State   types.String `tfsdk:"state"`
 	User    types.String `tfsdk:"user"`
+	State   types.String `tfsdk:"state"`
+	VSZ     types.Int64  `tfsdk:"vsz"`
+	CPU     types.String `tfsdk:"cpu"`
+	Mem     types.String `tfsdk:"mem"`
+	Command types.String `tfsdk:"command"`
 }
 
 type sysProcessListModel struct {
@@ -52,11 +54,12 @@ func (d *sysProcessListDataSource) Schema(_ context.Context, _ datasource.Schema
 					AttrTypes: map[string]attr.Type{
 						"pid":     types.Int64Type,
 						"ppid":    types.Int64Type,
-						"pgid":    types.Int64Type,
-						"name":    types.StringType,
-						"urandom": types.StringType,
-						"state":   types.StringType,
 						"user":    types.StringType,
+						"state":   types.StringType,
+						"vsz":     types.Int64Type,
+						"cpu":     types.StringType,
+						"mem":     types.StringType,
+						"command": types.StringType,
 					},
 				},
 			},
@@ -101,26 +104,30 @@ func (d *sysProcessListDataSource) Read(ctx context.Context, req datasource.Read
 	processes := make([]sysProcessModel, 0, len(processData))
 	for _, p := range processData {
 		pm := sysProcessModel{}
-		if v, ok := p["PID"].(float64); ok {
-			pm.PID = types.Int64Value(int64(v))
+		// luci.sys.process.list() returns ps(1) columns as strings.
+		if v, ok := toInt64(p["PID"]); ok {
+			pm.PID = types.Int64Value(v)
 		}
-		if v, ok := p["PPID"].(float64); ok {
-			pm.PPID = types.Int64Value(int64(v))
-		}
-		if v, ok := p["PGID"].(float64); ok {
-			pm.PGID = types.Int64Value(int64(v))
-		}
-		if v, ok := p["NAME"].(string); ok {
-			pm.Name = types.StringValue(v)
-		}
-		if v, ok := p["URANDOM"].(string); ok {
-			pm.URandom = types.StringValue(v)
-		}
-		if v, ok := p["STAT"].(string); ok {
-			pm.State = types.StringValue(v)
+		if v, ok := toInt64(p["PPID"]); ok {
+			pm.PPID = types.Int64Value(v)
 		}
 		if v, ok := p["USER"].(string); ok {
 			pm.User = types.StringValue(v)
+		}
+		if v, ok := p["STAT"].(string); ok {
+			pm.State = types.StringValue(strings.TrimSpace(v))
+		}
+		if v, ok := toInt64(p["VSZ"]); ok {
+			pm.VSZ = types.Int64Value(v)
+		}
+		if v, ok := p["%CPU"].(string); ok {
+			pm.CPU = types.StringValue(v)
+		}
+		if v, ok := p["%MEM"].(string); ok {
+			pm.Mem = types.StringValue(v)
+		}
+		if v, ok := p["COMMAND"].(string); ok {
+			pm.Command = types.StringValue(v)
 		}
 		processes = append(processes, pm)
 	}
@@ -129,11 +136,12 @@ func (d *sysProcessListDataSource) Read(ctx context.Context, req datasource.Read
 		AttrTypes: map[string]attr.Type{
 			"pid":     types.Int64Type,
 			"ppid":    types.Int64Type,
-			"pgid":    types.Int64Type,
-			"name":    types.StringType,
-			"urandom": types.StringType,
-			"state":   types.StringType,
 			"user":    types.StringType,
+			"state":   types.StringType,
+			"vsz":     types.Int64Type,
+			"cpu":     types.StringType,
+			"mem":     types.StringType,
+			"command": types.StringType,
 		},
 	}, processes)
 	resp.Diagnostics.Append(diags...)

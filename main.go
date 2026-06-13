@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	version = "0.1.0"
+	// "scaffold" default. Will be set by .gorelease configuration.
+	version = "dev"
 )
 
 func main() {

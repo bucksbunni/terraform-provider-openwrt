@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -88,46 +88,33 @@ func (d *sysNetRoutesDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	raw, err := d.client.SysCall(ctx, "net.routes")
+	// luci.sys.net.routes() was removed in modern LuCI, so read the kernel
+	// routing table directly. /proc/net/route columns:
+	//   Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT
+	// Destination/Gateway are little-endian hex IPv4 words.
+	out, err := d.client.SysExec(ctx, "cat /proc/net/route")
 	if err != nil {
 		resp.Diagnostics.AddError("Error calling /rpc/sys", err.Error())
 		return
 	}
 
-	var routesData []map[string]interface{}
-	if err := json.Unmarshal(raw, &routesData); err != nil {
-		resp.Diagnostics.AddError("Error parsing response", err.Error())
-		return
-	}
-
-	routes := make([]sysNetRouteModel, 0, len(routesData))
-	for _, r := range routesData {
-		rm := sysNetRouteModel{}
-		if v, ok := r["dest"].(string); ok {
-			rm.Dest = types.StringValue(v)
+	lines := nonHeaderLines(out, 1)
+	routes := make([]sysNetRouteModel, 0, len(lines))
+	for _, line := range lines {
+		f := strings.Fields(line)
+		if len(f) < 11 {
+			continue
 		}
-		if v, ok := r["gateway"].(string); ok {
-			rm.Gateway = types.StringValue(v)
-		}
-		if v, ok := r["metric"].(float64); ok {
-			rm.Metric = types.Int64Value(int64(v))
-		}
-		if v, ok := r["refcount"].(float64); ok {
-			rm.RefCount = types.Int64Value(int64(v))
-		}
-		if v, ok := r["usecount"].(float64); ok {
-			rm.UseCount = types.Int64Value(int64(v))
-		}
-		if v, ok := r["irtt"].(float64); ok {
-			rm.IRTT = types.Int64Value(int64(v))
-		}
-		if v, ok := r["flags"].(string); ok {
-			rm.Flags = types.StringValue(v)
-		}
-		if v, ok := r["device"].(string); ok {
-			rm.Device = types.StringValue(v)
-		}
-		routes = append(routes, rm)
+		routes = append(routes, sysNetRouteModel{
+			Dest:     types.StringValue(hexLEToIPv4(f[1])),
+			Gateway:  types.StringValue(hexLEToIPv4(f[2])),
+			Flags:    types.StringValue(f[3]),
+			RefCount: types.Int64Value(atoiSafe(f[4])),
+			UseCount: types.Int64Value(atoiSafe(f[5])),
+			Metric:   types.Int64Value(atoiSafe(f[6])),
+			IRTT:     types.Int64Value(atoiSafe(f[10])),
+			Device:   types.StringValue(f[0]),
+		})
 	}
 
 	routesList, diags := types.ListValueFrom(ctx, types.ObjectType{

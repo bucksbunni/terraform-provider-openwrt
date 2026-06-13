@@ -1,0 +1,43 @@
+# Example test configuration for acceptance tests.
+#
+# Copy this file to `testconfig.yaml` IN THIS DIRECTORY (internal/acceptance/) and
+# customize it for your environment. `testconfig.yaml` is git-ignored.
+#
+#   cp internal/acceptance/testconfig.example.yaml internal/acceptance/testconfig.yaml
+#
+# The values below tell the acceptance tests which devices/interfaces are SAFE to
+# create, modify, and destroy. When this file is absent, tests that mutate network
+# devices are skipped (see RequireTestConfig) so they can't disrupt a real router.
+#
+# DO NOT point these at devices your router relies on (br-lan, the default radio,
+# live LAN/WAN ports, etc.).
+
+# Bridge device(s) the tests may create/destroy. Must NOT already exist.
+bridge_devices:
+  - br-test
+
+# Bridge VLAN test: the bridge to attach VLANs to (created by the test) and the
+# physical ports to tag. Use only ports that are unused on your hardware.
+vlan_config:
+  bridge_device: br-test
+  tagged_ports:
+    - eth2
+    - eth3
+
+# Wireless tests manage this radio (create/update/destroy). On real hardware this
+# WILL disrupt the radio while the test runs — point it at a spare/unused radio, or
+# leave testconfig.yaml absent to skip wireless tests entirely.
+wireless:
+  radio: radio0
+
+# DHCP pool tests create a throwaway pool on this interface. It must be an existing
+# network interface. Note: using "lan" adds a second pool on the default LAN for the
+# duration of the test; prefer a dedicated test interface if you have one.
+dhcp:
+  interface: lan
+
+# Firewall forwarding test uses zones[0] -> zones[1]. These zones must exist.
+firewall:
+  zones:
+    - lan
+    - wan

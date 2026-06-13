@@ -1,0 +1,47 @@
+name: Conventional Commits
+
+# Lightweight check that every commit added in a pull request follows the
+# Conventional Commits spec: https://www.conventionalcommits.org/en/v1.0.0/
+# Pure bash + grep, no third-party actions.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  check-commits:
+    name: Validate commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # type(optional scope)!: description
+          pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9 ._/-]+\))?!?: .+'
+          status=0
+          for sha in $(git rev-list "$BASE_SHA..$HEAD_SHA"); do
+            # Skip merge commits (they have a second parent).
+            if git rev-parse --quiet --verify "$sha^2" >/dev/null; then
+              continue
+            fi
+            subject=$(git log -1 --format=%s "$sha")
+            if ! printf '%s' "$subject" | grep -Eq "$pattern"; then
+              echo "::error::Not a Conventional Commit: $sha \"$subject\""
+              status=1
+            fi
+          done
+          if [ "$status" -ne 0 ]; then
+            echo "Commit messages must follow https://www.conventionalcommits.org/en/v1.0.0/"
+            exit 1
+          fi
+          echo "All commit messages follow Conventional Commits."

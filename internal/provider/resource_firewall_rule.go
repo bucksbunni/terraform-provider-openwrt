@@ -142,14 +142,21 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
 
-	secName, err := r.client.UCISection(ctx, "firewall", "rule", name, options)
+	// Firewall rules are anonymous UCI sections that carry a "name" option as a
+	// display label. The label may contain characters (e.g. hyphens) that are
+	// invalid in UCI section identifiers, so create an anonymous section and set
+	// "name" as an option rather than using it as the section identifier.
+	secName, err := r.client.UCIAdd(ctx, "firewall", "rule")
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating firewall rule", err.Error())
 		return
 	}
-
-	if name == "" {
-		name = secName
+	options["name"] = name
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "firewall", secName, key, value); err != nil {
+			resp.Diagnostics.AddError("Error setting firewall rule option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "firewall"); err != nil {
@@ -160,6 +167,11 @@ func (r *firewallRuleResource) Create(ctx context.Context, req resource.CreateRe
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	// "enabled" is Optional+Computed; when not configured the plan value is
+	// unknown. The rule is enabled by default in UCI, so resolve it to true.
+	if plan.Enabled.IsUnknown() {
+		plan.Enabled = types.BoolValue(true)
+	}
 	plan.ID = types.StringValue(fmt.Sprintf("firewall/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -174,7 +186,17 @@ func (r *firewallRuleResource) Read(ctx context.Context, req resource.ReadReques
 
 	name := state.Name.ValueString()
 
-	data, err := r.client.UCIGetAll(ctx, "firewall", name)
+	secID, err := r.client.UCIFindSectionID(ctx, "firewall", "rule", "name", name)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading firewall rules", err.Error())
+		return
+	}
+	if secID == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	data, err := r.client.UCIGetAll(ctx, "firewall", secID)
 	if err != nil || len(data) == 0 {
 		resp.State.RemoveResource(ctx)
 		return
@@ -198,10 +220,23 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
+	options["name"] = name
 
-	if err := r.client.UCITSet(ctx, "firewall", name, options); err != nil {
-		resp.Diagnostics.AddError("Error updating firewall rule", err.Error())
+	secID, err := r.client.UCIFindSectionID(ctx, "firewall", "rule", "name", name)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading firewall rules", err.Error())
 		return
+	}
+	if secID == "" {
+		resp.Diagnostics.AddError("Error finding firewall rule", "rule not found")
+		return
+	}
+
+	for key, value := range options {
+		if err := r.client.UCISet(ctx, "firewall", secID, key, value); err != nil {
+			resp.Diagnostics.AddError("Error updating firewall rule option", err.Error())
+			return
+		}
 	}
 
 	if err := r.client.UCICommit(ctx, "firewall"); err != nil {
@@ -211,6 +246,11 @@ func (r *firewallRuleResource) Update(ctx context.Context, req resource.UpdateRe
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
+
+	if plan.Enabled.IsUnknown() {
+		plan.Enabled = types.BoolValue(true)
+	}
+	plan.ID = types.StringValue(fmt.Sprintf("firewall/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -224,7 +264,17 @@ func (r *firewallRuleResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	name := state.Name.ValueString()
 
-	if err := r.client.UCIDelete(ctx, "firewall", name); err != nil {
+	secID, err := r.client.UCIFindSectionID(ctx, "firewall", "rule", "name", name)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading firewall rules", err.Error())
+		return
+	}
+	if secID == "" {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	if err := r.client.UCIDelete(ctx, "firewall", secID); err != nil {
 		resp.Diagnostics.AddError("Error deleting firewall rule", err.Error())
 		return
 	}
@@ -294,7 +344,9 @@ func (r *firewallRuleResource) modelToOptions(ctx context.Context, plan firewall
 	if !plan.Extra.IsNull() {
 		options["extra"] = plan.Extra.ValueString()
 	}
-	if !plan.Enabled.IsNull() {
+	// Only write "enabled" when explicitly configured. When unknown (Computed,
+	// not set), leave it off so the rule keeps UCI's default (enabled).
+	if !plan.Enabled.IsNull() && !plan.Enabled.IsUnknown() {
 		if plan.Enabled.ValueBool() {
 			options["enabled"] = "1"
 		} else {
@@ -361,5 +413,8 @@ func (r *firewallRuleResource) optionsToModel(data map[string]interface{}, state
 	}
 	if v, ok := data["enabled"].(string); ok {
 		state.Enabled = types.BoolValue(v == "1" || v == "true")
+	} else {
+		// Absent in UCI means enabled (the default).
+		state.Enabled = types.BoolValue(true)
 	}
 }

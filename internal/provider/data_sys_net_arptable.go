@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -84,40 +84,30 @@ func (d *sysNetArpTableDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	raw, err := d.client.SysCall(ctx, "net.arptable")
+	// luci.sys.net.arptable() was removed in modern LuCI, so read the kernel
+	// ARP cache directly. /proc/net/arp columns:
+	//   IP address   HW type   Flags   HW address   Mask   Device
+	out, err := d.client.SysExec(ctx, "cat /proc/net/arp")
 	if err != nil {
 		resp.Diagnostics.AddError("Error calling /rpc/sys", err.Error())
 		return
 	}
 
-	var arpData []map[string]interface{}
-	if err := json.Unmarshal(raw, &arpData); err != nil {
-		resp.Diagnostics.AddError("Error parsing response", err.Error())
-		return
-	}
-
-	entries := make([]sysNetArpEntryModel, 0, len(arpData))
-	for _, a := range arpData {
-		am := sysNetArpEntryModel{}
-		if v, ok := a["IP address"].(string); ok {
-			am.IPAddress = types.StringValue(v)
+	lines := nonHeaderLines(out, 1)
+	entries := make([]sysNetArpEntryModel, 0, len(lines))
+	for _, line := range lines {
+		f := strings.Fields(line)
+		if len(f) < 6 {
+			continue
 		}
-		if v, ok := a["HW address"].(string); ok {
-			am.HWAddress = types.StringValue(v)
-		}
-		if v, ok := a["HW type"].(string); ok {
-			am.HWType = types.StringValue(v)
-		}
-		if v, ok := a["Flags"].(string); ok {
-			am.Flags = types.StringValue(v)
-		}
-		if v, ok := a["Mask"].(string); ok {
-			am.Mask = types.StringValue(v)
-		}
-		if v, ok := a["Device"].(string); ok {
-			am.Device = types.StringValue(v)
-		}
-		entries = append(entries, am)
+		entries = append(entries, sysNetArpEntryModel{
+			IPAddress: types.StringValue(f[0]),
+			HWType:    types.StringValue(f[1]),
+			Flags:     types.StringValue(f[2]),
+			HWAddress: types.StringValue(f[3]),
+			Mask:      types.StringValue(f[4]),
+			Device:    types.StringValue(f[5]),
+		})
 	}
 
 	entriesList, diags := types.ListValueFrom(ctx, types.ObjectType{

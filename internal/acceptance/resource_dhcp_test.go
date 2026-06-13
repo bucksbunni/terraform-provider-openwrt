@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestAccDHCPPool_basic(t *testing.T) {
+	dhcpInterface := GetDHCPInterface()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
 			PreCheck(t)
@@ -17,9 +19,9 @@ func TestAccDHCPPool_basic(t *testing.T) {
 		CheckDestroy:             testAccCheckDHCPPoolDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDHCPPoolConfigBasic("tf-acc-pool", "lan"),
+				Config: testAccDHCPPoolConfigBasic("tf-acc-pool", dhcpInterface),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "interface", "lan"),
+					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "interface", dhcpInterface),
 				),
 			},
 			{
@@ -32,6 +34,7 @@ func TestAccDHCPPool_basic(t *testing.T) {
 }
 
 func TestAccDHCPPool_Update(t *testing.T) {
+	dhcpInterface := GetDHCPInterface()
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {
 			PreCheck(t)
@@ -40,15 +43,15 @@ func TestAccDHCPPool_Update(t *testing.T) {
 		CheckDestroy:             testAccCheckDHCPPoolDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDHCPPoolConfigBasic("tf-acc-pool", "lan"),
+				Config: testAccDHCPPoolConfigBasic("tf-acc-pool", dhcpInterface),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "interface", "lan"),
+					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "interface", dhcpInterface),
 				),
 			},
 			{
 				Config: testAccDHCPPoolConfigUpdate("tf-acc-pool", "192.168.1.100", "192.168.1.200"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "interface", "lan"),
+					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "interface", dhcpInterface),
 					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "start", "100"),
 					resource.TestCheckResourceAttr("openwrt_dhcp_pool.test", "limit", "100"),
 				),
@@ -101,7 +104,7 @@ func testAccCheckDHCPPoolDestroyed(s *terraform.State) error {
 		}
 
 		if len(data) > 0 {
-			return nil
+			return fmt.Errorf("%s %q still exists after destroy", rs.Type, parts[1])
 		}
 	}
 
@@ -146,10 +149,11 @@ resource "openwrt_dhcp_pool" "test" {
 }
 
 func testAccDHCPPoolConfigUpdate(name, startIP, endIP string) string {
+	dhcpInterface := GetDHCPInterface()
 	return ProviderConfig() + `
 resource "openwrt_dhcp_pool" "test" {
   name      = "` + name + `"
-  interface = "lan"
+  interface = "` + dhcpInterface + `"
   start     = 100
   limit     = 100
 }
@@ -160,6 +164,110 @@ func testAccDHCPDNSMasqConfigBasic(domainSuffix string) string {
 	return ProviderConfig() + `
 resource "openwrt_dhcp_dnsmasq" "test" {
   domain = "` + domainSuffix + `"
+}
+`
+}
+
+func TestAccDHCPHost_basic(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			PreCheck(t)
+		},
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckDHCPHostDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDHCPHostConfigBasic("tf-acc-host", "192.168.1.150"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_dhcp_host.test", "name", "tf-acc-host"),
+					resource.TestCheckResourceAttr("openwrt_dhcp_host.test", "ip", "192.168.1.150"),
+				),
+			},
+			{
+				ResourceName:      "openwrt_dhcp_host.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
+func TestAccDHCPHost_Update(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			PreCheck(t)
+		},
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckDHCPHostDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDHCPHostConfigBasic("tf-acc-host", "192.168.1.150"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_dhcp_host.test", "name", "tf-acc-host"),
+					resource.TestCheckResourceAttr("openwrt_dhcp_host.test", "ip", "192.168.1.150"),
+				),
+			},
+			{
+				Config: testAccDHCPHostConfigUpdate("tf-acc-host"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_dhcp_host.test", "name", "tf-acc-host"),
+					resource.TestCheckResourceAttr("openwrt_dhcp_host.test", "ip", "192.168.1.200"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckDHCPHostDestroyed(s *terraform.State) error {
+	client := GetTestProvider(&testing.T{})
+	if client == nil {
+		return nil
+	}
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "openwrt_dhcp_host" {
+			continue
+		}
+
+		if rs.Primary.ID == "" {
+			continue
+		}
+
+		parts := splitImportID(rs.Primary.ID)
+		if len(parts) != 2 {
+			continue
+		}
+
+		data, err := client.UCIGetAll(context.Background(), parts[0], parts[1])
+		if err != nil {
+			return nil
+		}
+
+		if len(data) > 0 {
+			return fmt.Errorf("%s %q still exists after destroy", rs.Type, parts[1])
+		}
+	}
+
+	return nil
+}
+
+func testAccDHCPHostConfigBasic(name, ip string) string {
+	return ProviderConfig() + `
+resource "openwrt_dhcp_host" "test" {
+  name = "` + name + `"
+  ip   = "` + ip + `"
+  mac  = ["52:54:00:12:35:79"]
+}
+`
+}
+
+func testAccDHCPHostConfigUpdate(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_dhcp_host" "test" {
+  name      = "` + name + `"
+  ip        = "192.168.1.200"
+  mac       = ["52:54:00:12:35:79"]
+  leasetime = "24h"
 }
 `
 }
