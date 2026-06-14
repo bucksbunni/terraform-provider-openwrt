@@ -28,6 +28,21 @@ make test
 make lint
 ```
 
+## Acceptance Tests
+
+The acceptance tests in `internal/acceptance/` exercise real resources against a live OpenWrt instance and are skipped unless `TF_ACC=1` is set.
+
+For local development, `testinfra/` provisions a throwaway OpenWrt VM via libvirt/KVM:
+
+```bash
+make testinfra-image  # build the VM image (once)
+make testinfra-up     # provision the VM
+make testacc          # run the acceptance suite against it
+make testinfra-down   # destroy the VM
+```
+
+See [testinfra/README.md](testinfra/README.md) for prerequisites and VM details, and run `go doc ./internal/acceptance` for environment variables and test-writing conventions.
+
 ## Documentation
 
 ### Generating Documentation
