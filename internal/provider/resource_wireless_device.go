@@ -325,12 +325,12 @@ func (r *wirelessDeviceResource) optionsToModel(data map[string]interface{}, sta
 	}
 	if v, ok := data["path"].(string); ok {
 		state.Path = types.StringValue(v)
-	} else if state.Path.IsUnknown() {
+	} else {
 		state.Path = types.StringValue("")
 	}
 	if v, ok := data["band"].(string); ok {
 		state.Band = types.StringValue(v)
-	} else if state.Band.IsUnknown() {
+	} else {
 		state.Band = types.StringValue("")
 	}
 	if v, ok := data["channel"]; ok {
@@ -340,7 +340,7 @@ func (r *wirelessDeviceResource) optionsToModel(data map[string]interface{}, sta
 	}
 	if v, ok := data["htmode"].(string); ok {
 		state.HTMode = types.StringValue(v)
-	} else if state.HTMode.IsUnknown() {
+	} else {
 		state.HTMode = types.StringValue("")
 	}
 	if v, ok := data["hwmode"].(string); ok {
@@ -351,7 +351,7 @@ func (r *wirelessDeviceResource) optionsToModel(data map[string]interface{}, sta
 	}
 	if v, ok := data["disabled"].(string); ok {
 		state.Disabled = types.BoolValue(v == "1" || v == "true")
-	} else if state.Disabled.IsUnknown() {
+	} else {
 		state.Disabled = types.BoolValue(false)
 	}
 }
