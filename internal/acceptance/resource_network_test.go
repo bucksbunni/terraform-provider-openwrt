@@ -244,9 +244,9 @@ func TestAccNetworkWireguard_basic(t *testing.T) {
 		CheckDestroy:             testAccCheckNetworkWireguardDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccNetworkWireguardConfigBasic("wg-test"),
+				Config: testAccNetworkWireguardConfigBasic("wg_test"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg-test"),
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg_test"),
 					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "public_key", "test-public-key-12345"),
 				),
 			},
@@ -269,15 +269,15 @@ func TestAccNetworkWireguard_Update(t *testing.T) {
 		CheckDestroy:             testAccCheckNetworkWireguardDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccNetworkWireguardConfigBasic("wg-test"),
+				Config: testAccNetworkWireguardConfigBasic("wg_test"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg-test"),
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg_test"),
 				),
 			},
 			{
-				Config: testAccNetworkWireguardConfigUpdate("wg-test"),
+				Config: testAccNetworkWireguardConfigUpdate("wg_test"),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg-test"),
+					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "name", "wg_test"),
 					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "endpoint_host", "vpn.example.com"),
 					resource.TestCheckResourceAttr("openwrt_network_wireguard.test", "endpoint_port", "51820"),
 				),

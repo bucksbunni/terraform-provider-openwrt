@@ -171,6 +171,8 @@ func (r *networkWireguardResource) Update(ctx context.Context, req resource.Upda
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	plan.ID = types.StringValue(fmt.Sprintf("network/%s", name))
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
