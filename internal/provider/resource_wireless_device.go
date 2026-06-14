@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -63,11 +64,19 @@ func (r *wirelessDeviceResource) Schema(_ context.Context, _ resource.SchemaRequ
 			},
 			"path": schema.StringAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Hardware path to the wireless device.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"band": schema.StringAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Radio band: '2g', '5g', '6g'.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"channel": schema.Int64Attribute{
 				Optional:    true,
@@ -75,7 +84,11 @@ func (r *wirelessDeviceResource) Schema(_ context.Context, _ resource.SchemaRequ
 			},
 			"htmode": schema.StringAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Channel width/HT mode (e.g., 'VHT80', 'HT40', 'HE80').",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"hwmode": schema.StringAttribute{
 				Optional:    true,
@@ -87,7 +100,11 @@ func (r *wirelessDeviceResource) Schema(_ context.Context, _ resource.SchemaRequ
 			},
 			"disabled": schema.BoolAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "Disable the radio.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -134,6 +151,18 @@ func (r *wirelessDeviceResource) Create(ctx context.Context, req resource.Create
 	}
 	if err := r.client.WifiReload(ctx); err != nil {
 		tflog.Warn(ctx, "WiFi reload failed", map[string]interface{}{"error": err.Error()})
+	}
+
+	devices, err := r.client.UCIForeach(ctx, "wireless", "wifi-device")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading wireless device after create", err.Error())
+		return
+	}
+	for _, dev := range devices {
+		if dev[".name"] == name {
+			r.optionsToModel(dev, &plan)
+			break
+		}
 	}
 
 	plan.ID = types.StringValue(fmt.Sprintf("wireless/%s", name))
@@ -204,6 +233,18 @@ func (r *wirelessDeviceResource) Update(ctx context.Context, req resource.Update
 		tflog.Warn(ctx, "WiFi reload failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	devices, err := r.client.UCIForeach(ctx, "wireless", "wifi-device")
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading wireless device after update", err.Error())
+		return
+	}
+	for _, dev := range devices {
+		if dev[".name"] == name {
+			r.optionsToModel(dev, &plan)
+			break
+		}
+	}
+
 	plan.ID = types.StringValue(fmt.Sprintf("wireless/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -251,16 +292,16 @@ func (r *wirelessDeviceResource) modelToOptions(plan wirelessDeviceModel) map[st
 	if !plan.Type.IsNull() {
 		options["type"] = plan.Type.ValueString()
 	}
-	if !plan.Path.IsNull() {
+	if !plan.Path.IsNull() && !plan.Path.IsUnknown() {
 		options["path"] = plan.Path.ValueString()
 	}
-	if !plan.Band.IsNull() {
+	if !plan.Band.IsNull() && !plan.Band.IsUnknown() {
 		options["band"] = plan.Band.ValueString()
 	}
 	if !plan.Channel.IsNull() {
 		options["channel"] = plan.Channel.ValueInt64()
 	}
-	if !plan.HTMode.IsNull() {
+	if !plan.HTMode.IsNull() && !plan.HTMode.IsUnknown() {
 		options["htmode"] = plan.HTMode.ValueString()
 	}
 	if !plan.HWMode.IsNull() {
@@ -269,7 +310,7 @@ func (r *wirelessDeviceResource) modelToOptions(plan wirelessDeviceModel) map[st
 	if !plan.Country.IsNull() {
 		options["country"] = plan.Country.ValueString()
 	}
-	if !plan.Disabled.IsNull() {
+	if !plan.Disabled.IsNull() && !plan.Disabled.IsUnknown() {
 		if plan.Disabled.ValueBool() {
 			options["disabled"] = "1"
 		}
@@ -284,9 +325,13 @@ func (r *wirelessDeviceResource) optionsToModel(data map[string]interface{}, sta
 	}
 	if v, ok := data["path"].(string); ok {
 		state.Path = types.StringValue(v)
+	} else if state.Path.IsUnknown() {
+		state.Path = types.StringValue("")
 	}
 	if v, ok := data["band"].(string); ok {
 		state.Band = types.StringValue(v)
+	} else if state.Band.IsUnknown() {
+		state.Band = types.StringValue("")
 	}
 	if v, ok := data["channel"]; ok {
 		if f, ok := v.(float64); ok {
@@ -295,6 +340,8 @@ func (r *wirelessDeviceResource) optionsToModel(data map[string]interface{}, sta
 	}
 	if v, ok := data["htmode"].(string); ok {
 		state.HTMode = types.StringValue(v)
+	} else if state.HTMode.IsUnknown() {
+		state.HTMode = types.StringValue("")
 	}
 	if v, ok := data["hwmode"].(string); ok {
 		state.HWMode = types.StringValue(v)
@@ -304,5 +351,7 @@ func (r *wirelessDeviceResource) optionsToModel(data map[string]interface{}, sta
 	}
 	if v, ok := data["disabled"].(string); ok {
 		state.Disabled = types.BoolValue(v == "1" || v == "true")
+	} else if state.Disabled.IsUnknown() {
+		state.Disabled = types.BoolValue(false)
 	}
 }
