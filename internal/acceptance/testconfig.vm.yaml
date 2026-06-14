@@ -1,0 +1,36 @@
+# Test configuration matching the testinfra/ acceptance VM's topology.
+#
+# This file IS checked into git (unlike testconfig.yaml, which is
+# git-ignored and machine-specific). `make testacc` copies it to
+# testconfig.yaml before running acceptance tests, so RequireTestConfig-gated
+# tests run by default against the VM provisioned by `make testinfra-up`.
+#
+# The values below match testinfra/'s VM:
+#   - eth0 = wan (dhcp)
+#   - eth1 = lan/mgmt (static 192.168.56.2/24, the OPENWRT_HOST tests connect to)
+#   - eth2-eth5 = spare, unconfigured ports/networks for bridge/VLAN tests
+#   - radio0 = mac80211_hwsim simulated wireless radio
+#
+# If you're running acceptance tests against a real router instead of the VM,
+# do NOT use this file -- copy testconfig.example.yaml to testconfig.yaml and
+# point it at devices that are safe to mutate on your hardware.
+
+bridge_devices:
+  - br-test
+
+vlan_config:
+  bridge_device: br-test
+  tagged_ports:
+    - eth2
+    - eth3
+
+wireless:
+  radio: radio0
+
+dhcp:
+  interface: lan
+
+firewall:
+  zones:
+    - lan
+    - wan

@@ -17,28 +17,38 @@
 //
 // # Setting Up a Test VM
 //
-// The testinfra/ directory contains Terraform configuration for provisioning
-// an OpenWrt VM using libvirt/KVM. To set up a test VM:
+// The testinfra/ directory contains a Terraform module that provisions a
+// local OpenWrt VM (via libvirt/KVM) for running acceptance tests against.
+// The root Makefile wraps the whole workflow:
 //
 //	# Install prerequisites (Debian/Ubuntu)
-//	sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+//	sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients podman
 //
-//	# Initialize Terraform
-//	cd testinfra
-//	cp terraform.tfvars.example terraform.tfvars
-//	# Edit terraform.tfvars with your settings
-//	terraform init
+//	# Build the OpenWrt VM image (only needed once; cached under testinfra/build/)
+//	make testinfra-image
 //
-//	# Provision the VM
-//	terraform apply
+//	# Provision the VM and wait for its JSON-RPC API to come up
+//	make testinfra-up
 //
-//	# Get the VM IP address
-//	OPENWRT_HOST="http://$(terraform output -raw openwrt_ip)"
+//	# Run the acceptance test suite against the VM (installs a VM-matching
+//	# testconfig.yaml automatically; see TestConfig)
+//	make testacc
 //
-//	# After tests, cleanup
-//	terraform destroy
+//	# Tear down the VM when done
+//	make testinfra-down
 //
-// For more details, see testinfra/README.md.
+// terraform apply (run by `make testinfra-up`) provisions a VM reachable at
+// the URL in its openwrt_host output (default "http://192.168.56.2"), with
+// root/root credentials set by testinfra's image build. `make testacc` uses
+// these directly:
+//
+//	OPENWRT_HOST="http://192.168.56.2"
+//	OPENWRT_USERNAME="root"
+//	OPENWRT_PASSWORD="root"
+//
+// The VM's interfaces (eth0=wan, eth1=lan/mgmt, eth2-eth5=spare) and
+// simulated wireless radio match the built-in TestConfig defaults, so
+// RequireTestConfig-gated tests run without manual setup against this VM.
 //
 // # Running Tests
 //
