@@ -78,12 +78,12 @@ func TestAccWirelessInterface_basic(t *testing.T) {
 			{
 				Config: testAccWirelessInterfaceConfigBasic("test-wifi", radio),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_wireless_interface.test", "device", radio),
-					resource.TestCheckResourceAttr("openwrt_wireless_interface.test", "mode", "ap"),
+					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "device", radio),
+					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "mode", "ap"),
 				),
 			},
 			{
-				ResourceName:      "openwrt_wireless_interface.test",
+				ResourceName:      "openwrt_wireless_iface.test",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
@@ -105,14 +105,14 @@ func TestAccWirelessInterface_Update(t *testing.T) {
 			{
 				Config: testAccWirelessInterfaceConfigBasic("test-wifi", radio),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_wireless_interface.test", "device", radio),
+					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "device", radio),
 				),
 			},
 			{
 				Config: testAccWirelessInterfaceConfigUpdate("test-wifi", radio),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("openwrt_wireless_interface.test", "device", radio),
-					resource.TestCheckResourceAttr("openwrt_wireless_interface.test", "ssid", "TestNetwork"),
+					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "device", radio),
+					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "ssid", "TestNetwork"),
 				),
 			},
 		},
@@ -159,7 +159,7 @@ func testAccCheckWirelessInterfaceDestroyed(s *terraform.State) error {
 	}
 
 	for _, rs := range s.RootModule().Resources {
-		if rs.Type != "openwrt_wireless_interface" {
+		if rs.Type != "openwrt_wireless_iface" {
 			continue
 		}
 
@@ -207,7 +207,7 @@ resource "openwrt_wireless_device" "test" {
 
 func testAccWirelessInterfaceConfigBasic(name, device string) string {
 	return ProviderConfig() + `
-resource "openwrt_wireless_interface" "test" {
+resource "openwrt_wireless_iface" "test" {
   device = "` + device + `"
   mode   = "ap"
   ssid   = "TestAccNetwork"
@@ -217,7 +217,7 @@ resource "openwrt_wireless_interface" "test" {
 
 func testAccWirelessInterfaceConfigUpdate(name, device string) string {
 	return ProviderConfig() + `
-resource "openwrt_wireless_interface" "test" {
+resource "openwrt_wireless_iface" "test" {
   device     = "` + device + `"
   mode       = "ap"
   ssid       = "TestNetwork"
