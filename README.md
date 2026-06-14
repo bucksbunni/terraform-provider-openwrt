@@ -72,7 +72,7 @@ resource "openwrt_network_interface" "lan" {
 
 - LuCI path is fixed to /cgi-bin/luci; making it configurable is a future enhancement.
 - TLS options are limited to insecure; supporting CA bundles and client certs would be useful for production.
-- Acceptance tests require a live OpenWrt device.
+- Acceptance tests require a live OpenWrt device; `testinfra/` can provision one locally via libvirt/KVM - see [testinfra/README.md](testinfra/README.md).
 - Import support could be extended for additional resources.
 
 ## License
