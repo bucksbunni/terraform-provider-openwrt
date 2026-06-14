@@ -76,7 +76,7 @@ func TestAccWirelessInterface_basic(t *testing.T) {
 		CheckDestroy:             testAccCheckWirelessInterfaceDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccWirelessInterfaceConfigBasic("test-wifi", radio),
+				Config: testAccWirelessInterfaceConfigBasic("test_wifi", radio),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "device", radio),
 					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "mode", "ap"),
@@ -103,13 +103,13 @@ func TestAccWirelessInterface_Update(t *testing.T) {
 		CheckDestroy:             testAccCheckWirelessInterfaceDestroyed,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccWirelessInterfaceConfigBasic("test-wifi", radio),
+				Config: testAccWirelessInterfaceConfigBasic("test_wifi", radio),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "device", radio),
 				),
 			},
 			{
-				Config: testAccWirelessInterfaceConfigUpdate("test-wifi", radio),
+				Config: testAccWirelessInterfaceConfigUpdate("test_wifi", radio),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "device", radio),
 					resource.TestCheckResourceAttr("openwrt_wireless_iface.test", "ssid", "TestNetwork"),
@@ -208,6 +208,7 @@ resource "openwrt_wireless_device" "test" {
 func testAccWirelessInterfaceConfigBasic(name, device string) string {
 	return ProviderConfig() + `
 resource "openwrt_wireless_iface" "test" {
+  name   = "` + name + `"
   device = "` + device + `"
   mode   = "ap"
   ssid   = "TestAccNetwork"
@@ -218,6 +219,7 @@ resource "openwrt_wireless_iface" "test" {
 func testAccWirelessInterfaceConfigUpdate(name, device string) string {
 	return ProviderConfig() + `
 resource "openwrt_wireless_iface" "test" {
+  name       = "` + name + `"
   device     = "` + device + `"
   mode       = "ap"
   ssid       = "TestNetwork"
