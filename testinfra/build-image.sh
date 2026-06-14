@@ -15,6 +15,23 @@ set -euo pipefail
 OPENWRT_VERSION="24.10.2"
 IMAGEBUILDER_IMAGE="docker.io/openwrt/imagebuilder:x86-64-${OPENWRT_VERSION}"
 
+# Packages installed on top of the "generic" profile defaults:
+# - luci-mod-rpc, luci-lib-ipkg, luci-compat: provide the /cgi-bin/luci/rpc/*
+#   JSON-RPC backend used by the provider's client (matches README.md's
+#   "Requirements" section).
+# - uhttpd: web server. Without it nothing listens on port 80 and the
+#   JSON-RPC endpoint above is unreachable.
+# - luci-theme-bootstrap: OpenWrt 24.10's ucode-based LuCI dispatcher
+#   references the configured theme even for "notemplate" API routes.
+#   Without a theme installed, /cgi-bin/luci/rpc/* returns a 500
+#   ("Failed to load template 'themes/bootstrap/header'") instead of JSON,
+#   even though luci-mod-rpc itself works fine.
+# - kmod-wireguard, wireguard-tools: enable RequireWireguard-gated
+#   acceptance tests (see image/files/etc/modules.d/30-wireguard).
+# - kmod-mac80211-hwsim, wpad-mbedtls, wireless-tools: simulated wireless
+#   radios for RequireWireless-gated acceptance tests (see
+#   image/files/etc/modules.d/30-mac80211-hwsim and the `wifi config` step
+#   in image/files/etc/uci-defaults/99-acceptance-setup).
 PACKAGES="luci-mod-rpc luci-lib-ipkg luci-compat uhttpd luci-theme-bootstrap kmod-wireguard wireguard-tools kmod-mac80211-hwsim wpad-mbedtls wireless-tools"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
