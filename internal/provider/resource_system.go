@@ -162,6 +162,7 @@ func (r *systemResource) Update(ctx context.Context, req resource.UpdateRequest,
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	plan.ID = types.StringValue("system")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
