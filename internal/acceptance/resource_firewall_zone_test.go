@@ -60,6 +60,13 @@ func TestAccFirewallZone_Update(t *testing.T) {
 					resource.TestCheckResourceAttr("openwrt_firewall_zone.test", "masq", "true"),
 				),
 			},
+			{
+				Config: testAccFirewallZoneConfigMasqFalse("tf-acc-test"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_firewall_zone.test", "name", "tf-acc-test"),
+					resource.TestCheckResourceAttr("openwrt_firewall_zone.test", "masq", "false"),
+				),
+			},
 		},
 	})
 }
@@ -116,6 +123,18 @@ resource "openwrt_firewall_zone" "test" {
   output = "DROP"
   forward = "REJECT"
   masq   = true
+}
+`
+}
+
+func testAccFirewallZoneConfigMasqFalse(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_firewall_zone" "test" {
+  name    = "` + name + `"
+  input   = "DROP"
+  output  = "DROP"
+  forward = "REJECT"
+  masq    = false
 }
 `
 }
