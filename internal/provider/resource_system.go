@@ -167,7 +167,48 @@ func (r *systemResource) Update(ctx context.Context, req resource.UpdateRequest,
 }
 
 func (r *systemResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	resp.Diagnostics.AddError("Delete not supported", "System settings cannot be deleted, only modified.")
+	var state systemModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Remove each managed option individually so UCI reverts to its built-in
+	// defaults. The system section itself cannot be deleted.
+	optionKeys := map[string]bool{
+		"hostname":     !state.Hostname.IsNull(),
+		"ttylogin":     !state.TtyLogin.IsNull(),
+		"log_size":     !state.LogSize.IsNull(),
+		"urandom_seed": !state.UrandomSeed.IsNull(),
+		"zonename":     !state.Zonename.IsNull(),
+		"log_proto":    !state.LogProto.IsNull(),
+		"conloglevel":  !state.ConLogLevel.IsNull(),
+		"cronloglevel": !state.CronLogLevel.IsNull(),
+	}
+
+	anyDeleted := false
+	for key, shouldDelete := range optionKeys {
+		if !shouldDelete {
+			continue
+		}
+		if err := r.client.UCIDeleteOption(ctx, "system", "system", key); err != nil {
+			tflog.Warn(ctx, "Failed to delete system option", map[string]interface{}{"key": key, "error": err.Error()})
+		} else {
+			anyDeleted = true
+		}
+	}
+
+	if anyDeleted {
+		if err := r.client.UCICommit(ctx, "system"); err != nil {
+			resp.Diagnostics.AddError("Error committing system config", err.Error())
+			return
+		}
+		if err := r.client.UCIApply(ctx, false); err != nil {
+			tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
+		}
+	}
+
+	resp.State.RemoveResource(ctx)
 }
 
 func (r *systemResource) modelToOptions(plan systemModel) map[string]interface{} {
