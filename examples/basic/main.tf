@@ -28,6 +28,8 @@ output "uptime_seconds" {
   value       = data.openwrt_sys_uptime.status.uptime
 }
 
+data "openwrt_sys_net_devices" "main" {}
+
 output "network_interfaces" {
   description = "Available network interfaces"
   value       = data.openwrt_sys_net_devices.main.devices
