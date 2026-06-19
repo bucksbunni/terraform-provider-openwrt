@@ -327,6 +327,8 @@ func (r *firewallZoneResource) modelToOptions(ctx context.Context, plan firewall
 	if !plan.Masq.IsNull() {
 		if plan.Masq.ValueBool() {
 			options["masq"] = "1"
+		} else {
+			options["masq"] = "0"
 		}
 	}
 	if !plan.MasqSrc.IsNull() {
@@ -338,6 +340,8 @@ func (r *firewallZoneResource) modelToOptions(ctx context.Context, plan firewall
 	if !plan.MtuFix.IsNull() {
 		if plan.MtuFix.ValueBool() {
 			options["mtu_fix"] = "1"
+		} else {
+			options["mtu_fix"] = "0"
 		}
 	}
 	if !plan.Network.IsNull() {
