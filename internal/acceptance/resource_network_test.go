@@ -170,6 +170,54 @@ resource "openwrt_network_interface" "test" {
 `
 }
 
+func TestAccNetworkInterface_DualStack(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { PreCheck(t) },
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckNetworkInterfaceDestroyed,
+		Steps: []resource.TestStep{
+			{
+				// Create with both IPv4 and IPv6
+				Config: testAccNetworkInterfaceConfigDualStack("tf_acc_dual"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf_acc_dual"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ipaddr.0", "192.168.101.1/24"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ip6addr.0", "fd00:acc::1/64"),
+				),
+			},
+			{
+				// Update: remove ip6addr — verify it is cleared from UCI (not left stale)
+				Config: testAccNetworkInterfaceConfigIPv4Only("tf_acc_dual"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ipaddr.0", "192.168.101.1/24"),
+					resource.TestCheckNoResourceAttr("openwrt_network_interface.test", "ip6addr.#"),
+				),
+			},
+		},
+	})
+}
+
+func testAccNetworkInterfaceConfigDualStack(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_interface" "test" {
+  name    = "` + name + `"
+  proto   = "static"
+  ipaddr  = ["192.168.101.1/24"]
+  ip6addr = ["fd00:acc::1/64"]
+}
+`
+}
+
+func testAccNetworkInterfaceConfigIPv4Only(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_interface" "test" {
+  name   = "` + name + `"
+  proto  = "static"
+  ipaddr = ["192.168.101.1/24"]
+}
+`
+}
+
 func TestAccNetworkBridgeVlan_basic(t *testing.T) {
 	RequireTestConfig(t)
 	bridgeDevice := GetVLANBridgeDevice()

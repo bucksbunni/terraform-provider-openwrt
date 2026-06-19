@@ -221,10 +221,34 @@ func (r *networkInterfaceResource) Update(ctx context.Context, req resource.Upda
 
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
-
-	// A network interface is a named UCI section whose identifier is the
-	// interface name itself, so address it directly.
 	secName := name
+
+	// Delete UCI options that were set in the previous state but are now absent
+	// from the plan. Without this, removing an option from config leaves the old
+	// value in UCI indefinitely.
+	optionWasRemoved := func(wasSet, nowSet bool) bool { return wasSet && !nowSet }
+	removedKeys := map[string]bool{
+		"device":       optionWasRemoved(!state.Device.IsNull(), !plan.Device.IsNull()),
+		"ipaddr":       optionWasRemoved(!state.IPAddr.IsNull(), !plan.IPAddr.IsNull()),
+		"gateway":      optionWasRemoved(!state.Gateway.IsNull(), !plan.Gateway.IsNull()),
+		"dns":          optionWasRemoved(!state.DNS.IsNull(), !plan.DNS.IsNull()),
+		"metric":       optionWasRemoved(!state.Metric.IsNull(), !plan.Metric.IsNull()),
+		"delegate":     optionWasRemoved(!state.Delegate.IsNull(), !plan.Delegate.IsNull()),
+		"ip6addr":      optionWasRemoved(!state.IP6Addr.IsNull(), !plan.IP6Addr.IsNull()),
+		"ip6prefix":    optionWasRemoved(!state.IP6Prefix.IsNull(), !plan.IP6Prefix.IsNull()),
+		"ip6assign":    optionWasRemoved(!state.IP6Assign.IsNull(), !plan.IP6Assign.IsNull()),
+		"ip6gateway":   optionWasRemoved(!state.IP6Gateway.IsNull(), !plan.IP6Gateway.IsNull()),
+		"auto":         optionWasRemoved(!state.Auto.IsNull(), !plan.Auto.IsNull()),
+		"type":         optionWasRemoved(!state.IfType.IsNull(), !plan.IfType.IsNull()),
+		"bridge_empty": optionWasRemoved(!state.BridgeEmpty.IsNull(), !plan.BridgeEmpty.IsNull()),
+	}
+	for key, remove := range removedKeys {
+		if remove {
+			if err := r.client.UCIDeleteOption(ctx, "network", secName, key); err != nil {
+				tflog.Warn(ctx, "Failed to delete removed option", map[string]interface{}{"key": key, "error": err.Error()})
+			}
+		}
+	}
 
 	for key, value := range options {
 		if err := r.client.UCISet(ctx, "network", secName, key, value); err != nil {
