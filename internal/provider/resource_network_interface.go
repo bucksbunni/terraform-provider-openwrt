@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -37,7 +36,7 @@ type networkInterfaceModel struct {
 	IP6Prefix   types.String `tfsdk:"ip6prefix"`
 	IP6Assign   types.String `tfsdk:"ip6assign"`
 	IP6Gateway  types.String `tfsdk:"ip6gateway"`
-	Auto        types.String `tfsdk:"auto"`
+	Auto        types.Bool   `tfsdk:"auto"`
 	IfType      types.String `tfsdk:"type"`
 	BridgeEmpty types.Bool   `tfsdk:"bridge_empty"`
 }
@@ -108,11 +107,9 @@ func (r *networkInterfaceResource) Schema(_ context.Context, _ resource.SchemaRe
 				Optional:    true,
 				Description: "IPv6 default gateway.",
 			},
-			"auto": schema.StringAttribute{
+			"auto": schema.BoolAttribute{
 				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1"),
-				Description: "Enable interface on boot ('0' or '1').",
+				Description: "Bring up interface on boot (default: true).",
 			},
 			"type": schema.StringAttribute{
 				Optional:    true,
@@ -339,7 +336,7 @@ func (r *networkInterfaceResource) modelToOptions(ctx context.Context, plan netw
 		options["ip6gateway"] = plan.IP6Gateway.ValueString()
 	}
 	if !plan.Auto.IsNull() {
-		options["auto"] = plan.Auto.ValueString()
+		options["auto"] = boolToString(plan.Auto.ValueBool())
 	}
 	if !plan.IfType.IsNull() {
 		options["type"] = plan.IfType.ValueString()
@@ -415,7 +412,7 @@ func (r *networkInterfaceResource) optionsToModel(ctx context.Context, data map[
 		state.IP6Gateway = types.StringValue(v)
 	}
 	if v, ok := data["auto"].(string); ok {
-		state.Auto = types.StringValue(v)
+		state.Auto = types.BoolValue(v == "1" || v == "true")
 	}
 	if v, ok := data["type"].(string); ok {
 		state.IfType = types.StringValue(v)

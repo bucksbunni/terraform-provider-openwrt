@@ -170,6 +170,48 @@ resource "openwrt_network_interface" "test" {
 `
 }
 
+func TestAccNetworkInterface_AutoBool(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { PreCheck(t) },
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckNetworkInterfaceDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNetworkInterfaceConfigAutoTrue("tf_acc_autobool"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "auto", "true"),
+				),
+			},
+			{
+				Config: testAccNetworkInterfaceConfigAutoFalse("tf_acc_autobool"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "auto", "false"),
+				),
+			},
+		},
+	})
+}
+
+func testAccNetworkInterfaceConfigAutoTrue(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_interface" "test" {
+  name  = "` + name + `"
+  proto = "static"
+  auto  = true
+}
+`
+}
+
+func testAccNetworkInterfaceConfigAutoFalse(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_interface" "test" {
+  name  = "` + name + `"
+  proto = "static"
+  auto  = false
+}
+`
+}
+
 func TestAccNetworkBridgeVlan_basic(t *testing.T) {
 	RequireTestConfig(t)
 	bridgeDevice := GetVLANBridgeDevice()

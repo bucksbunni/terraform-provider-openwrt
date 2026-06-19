@@ -45,14 +45,14 @@ resource "openwrt_network_interface" "lan" {
   ipaddr  = ["192.168.1.1/24"]
   ip6addr = ["fd00:lan::1/64"]
   metric  = 100
-  auto    = "1"
+  auto    = true
 }
 
 resource "openwrt_network_interface" "wan" {
   name   = "wan"
   proto  = "dhcp"
   device = "eth0"
-  auto   = "1"
+  auto    = true
 }
 
 resource "openwrt_network_interface" "guest" {
@@ -61,7 +61,7 @@ resource "openwrt_network_interface" "guest" {
   device  = "br-guest"
   ipaddr  = ["10.10.10.1/24"]
   ip6addr = ["fd00:guest::1/64"]
-  auto    = "1"
+  auto    = true
 }
 
 resource "openwrt_network_bridge_vlan" "guest_vlan10" {

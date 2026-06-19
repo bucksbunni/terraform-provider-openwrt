@@ -51,7 +51,7 @@ resource "openwrt_network_interface" "lan" {
   device  = "br-lan"
   ipaddr  = ["192.168.1.1/24"]
   metric  = 100
-  auto    = "1"
+  auto    = true
 
   lifecycle {
     ignore_changes = [ipaddr]
@@ -62,7 +62,7 @@ resource "openwrt_network_interface" "wan" {
   name   = "wan"
   proto  = "dhcp"
   device = "eth0"
-  auto   = "1"
+  auto    = true
 }
 
 resource "openwrt_network_interface" "guest" {
@@ -71,7 +71,7 @@ resource "openwrt_network_interface" "guest" {
   device  = "br-guest.10"
   ipaddr  = ["10.10.10.1/24"]
   ip6addr = ["fd00:cafe::1/64"]
-  auto    = "1"
+  auto    = true
 }
 
 resource "openwrt_network_interface" "wireguard" {
@@ -79,7 +79,7 @@ resource "openwrt_network_interface" "wireguard" {
   proto   = "wireguard"
   ipaddr  = ["10.20.0.1/24"]
   ip6addr = ["fd00:wg::1/64"]
-  auto    = "1"
+  auto    = true
 }
 
 resource "openwrt_network_wireguard" "peer_nordvpn" {

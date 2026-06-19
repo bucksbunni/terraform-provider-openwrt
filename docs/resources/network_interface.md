@@ -22,7 +22,7 @@ resource "openwrt_network_interface" "lan" {
   gateway = "192.168.1.254"
   dns     = ["8.8.8.8", "1.1.1.1"]
   metric  = 100
-  auto    = "1"
+  auto    = true
 }
 
 # Multi-IP interface (multiple addresses on one interface)
@@ -40,7 +40,7 @@ resource "openwrt_network_interface" "wan" {
   proto  = "dhcp"
   device = "eth0"
   metric = 100
-  auto   = "1"
+  auto    = true
 }
 ```
 
@@ -64,7 +64,7 @@ See [examples/network-interfaces](../../examples/network-interfaces/) for more c
 
 ### Optional
 
-- `auto` (String) Enable interface on boot ('0' or '1').
+- `auto` (Boolean) Bring up interface on boot (default: true).
 - `bridge_empty` (Boolean) Allow empty bridge (no ports).
 - `delegate` (Boolean) Enable IPv6 delegation (default: true).
 - `device` (String) Network device (e.g., 'eth0', 'br-lan', 'wg0').
