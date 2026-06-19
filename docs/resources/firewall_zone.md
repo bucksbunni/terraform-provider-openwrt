@@ -33,3 +33,4 @@ Manages an OpenWrt firewall zone.
 ### Read-Only
 
 - `id` (String) Internal ID: firewall/<zone_name>.
+- `section_name` (String) Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.

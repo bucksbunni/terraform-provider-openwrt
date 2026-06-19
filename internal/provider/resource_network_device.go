@@ -24,6 +24,7 @@ type networkDeviceResource struct {
 
 type networkDeviceModel struct {
 	ID             types.String `tfsdk:"id"`
+	SectionName    types.String `tfsdk:"section_name"`
 	Name           types.String `tfsdk:"name"`
 	Type           types.String `tfsdk:"type"`
 	Ports          types.List   `tfsdk:"ports"`
@@ -42,6 +43,13 @@ func (r *networkDeviceResource) Schema(_ context.Context, _ resource.SchemaReque
 			"id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal ID: network/<device_name>.",
+			},
+			"section_name": schema.StringAttribute{
+				Computed:    true,
+				Description: "Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
@@ -98,6 +106,7 @@ func (r *networkDeviceResource) Create(ctx context.Context, req resource.CreateR
 		resp.Diagnostics.AddError("Error creating network device", err.Error())
 		return
 	}
+	plan.SectionName = types.StringValue(secName)
 
 	for key, value := range options {
 		if err := r.client.UCISet(ctx, "network", secName, key, value); err != nil {
@@ -133,26 +142,18 @@ func (r *networkDeviceResource) Read(ctx context.Context, req resource.ReadReque
 
 	name := state.Name.ValueString()
 
-	devices, err := r.client.UCIForeach(ctx, "network", "device")
+	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "network", "device", state.SectionName.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading network devices", err.Error())
 		return
 	}
-
-	var data map[string]interface{}
-	for _, dev := range devices {
-		if dev["name"] == name {
-			data = dev
-			break
-		}
-	}
-
-	if data == nil {
+	if !found {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	r.optionsToModel(data, &state)
+	state.SectionName = types.StringValue(sectionName)
 	state.ID = types.StringValue(fmt.Sprintf("network/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -171,21 +172,12 @@ func (r *networkDeviceResource) Update(ctx context.Context, req resource.UpdateR
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
 
-	devices, err := r.client.UCIForeach(ctx, "network", "device")
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "network", "device", state.SectionName.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading network devices", err.Error())
 		return
 	}
-
-	var secName string
-	for _, dev := range devices {
-		if dev["name"] == name {
-			secName = dev[".name"].(string)
-			break
-		}
-	}
-
-	if secName == "" {
+	if !found {
 		resp.Diagnostics.AddError("Error finding network device", "device not found")
 		return
 	}
@@ -205,6 +197,7 @@ func (r *networkDeviceResource) Update(ctx context.Context, req resource.UpdateR
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	plan.SectionName = types.StringValue(secName)
 	plan.ID = types.StringValue(fmt.Sprintf("network/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -219,32 +212,27 @@ func (r *networkDeviceResource) Delete(ctx context.Context, req resource.DeleteR
 
 	name := state.Name.ValueString()
 
-	devices, err := r.client.UCIForeach(ctx, "network", "device")
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "network", "device", state.SectionName.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading network devices", err.Error())
 		return
 	}
-
-	var secName string
-	for _, dev := range devices {
-		if dev["name"] == name {
-			secName = dev[".name"].(string)
-			break
-		}
+	if !found {
+		// Section already absent - treat as already deleted.
+		resp.State.RemoveResource(ctx)
+		return
 	}
 
-	if secName != "" {
-		if err := r.client.UCIDelete(ctx, "network", secName); err != nil {
-			resp.Diagnostics.AddError("Error deleting network device", err.Error())
-			return
-		}
-		if err := r.client.UCICommit(ctx, "network"); err != nil {
-			resp.Diagnostics.AddError("Error committing network config", err.Error())
-			return
-		}
-		if err := r.client.UCIApply(ctx, false); err != nil {
-			tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
-		}
+	if err := r.client.UCIDelete(ctx, "network", secName); err != nil {
+		resp.Diagnostics.AddError("Error deleting network device", err.Error())
+		return
+	}
+	if err := r.client.UCICommit(ctx, "network"); err != nil {
+		resp.Diagnostics.AddError("Error committing network config", err.Error())
+		return
+	}
+	if err := r.client.UCIApply(ctx, false); err != nil {
+		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
 	resp.State.RemoveResource(ctx)
