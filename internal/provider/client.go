@@ -296,6 +296,11 @@ func (c *JsonRpcClient) UCIDelete(ctx context.Context, config, section string) e
 	return err
 }
 
+func (c *JsonRpcClient) UCIDeleteOption(ctx context.Context, config, section, option string) error {
+	_, err := c.call(ctx, "uci", "delete", config, section, option)
+	return err
+}
+
 func (c *JsonRpcClient) UCICommit(ctx context.Context, config string) error {
 	_, err := c.call(ctx, "uci", "commit", config)
 	return err
