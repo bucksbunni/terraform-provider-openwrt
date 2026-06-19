@@ -24,3 +24,13 @@ Manages a bridge VLAN assignment in OpenWrt.
 ### Read-Only
 
 - `id` (String) Internal ID: network/<device>_<vlan>.
+
+## Notes
+
+### Destroy ordering
+
+Always declare `depends_on = [openwrt_network_device.<name>]` on the bridge VLAN resource so Terraform destroys the VLAN before the parent bridge device. Destroying the bridge first can leave the UCI section in an inconsistent state.
+
+### Kernel VLAN device cleanup
+
+When a bridge VLAN is destroyed, the provider attempts to delete the corresponding kernel VLAN device (e.g., `br-guest.10`) via `ip link delete` after reloading the network config. This is a best-effort operation; if netifd has already cleaned up the device the command is silently ignored.

@@ -267,6 +267,15 @@ func (r *networkBridgeVlanResource) Delete(ctx context.Context, req resource.Del
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	// netifd does not always remove the VLAN device (e.g. br-guest.10) from the
+	// kernel when the bridge-vlan UCI section is removed and network is reloaded.
+	// Best-effort explicit deletion; ignore errors since netifd may have already
+	// cleaned it up.
+	vlanDevice := fmt.Sprintf("%s.%d", device, vlan)
+	if _, err := r.client.SysExec(ctx, fmt.Sprintf("ip link delete %s 2>/dev/null; true", vlanDevice)); err != nil {
+		tflog.Warn(ctx, "Failed to delete VLAN device (may already be gone)", map[string]interface{}{"device": vlanDevice, "error": err.Error()})
+	}
+
 	resp.State.RemoveResource(ctx)
 }
 
