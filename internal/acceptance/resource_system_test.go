@@ -328,3 +328,47 @@ resource "openwrt_system" "test" {
 }
 `
 }
+
+func TestAccSystem_Destroy(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { PreCheck(t) },
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckSystemOptionCleared,
+		Steps: []resource.TestStep{
+			{
+				Config: ProviderConfig() + `
+resource "openwrt_system" "test" {
+  hostname = "tf-acc-hostname"
+}
+`,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_system.test", "hostname", "tf-acc-hostname"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckSystemOptionCleared(s *terraform.State) error {
+	client := GetTestProvider(&testing.T{})
+	if client == nil {
+		return nil
+	}
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "openwrt_system" {
+			continue
+		}
+
+		data, err := client.UCIGetAll(context.Background(), "system", "system")
+		if err != nil {
+			return nil
+		}
+
+		if hostname, ok := data["hostname"].(string); ok && hostname == "tf-acc-hostname" {
+			return fmt.Errorf("openwrt_system hostname still set to %q after destroy", hostname)
+		}
+	}
+
+	return nil
+}
