@@ -237,7 +237,7 @@ func (r *networkInterfaceResource) Update(ctx context.Context, req resource.Upda
 		"ip6addr":      optionWasRemoved(!state.IP6Addr.IsNull(), !plan.IP6Addr.IsNull()),
 		"ip6prefix":    optionWasRemoved(!state.IP6Prefix.IsNull(), !plan.IP6Prefix.IsNull()),
 		"ip6assign":    optionWasRemoved(!state.IP6Assign.IsNull(), !plan.IP6Assign.IsNull()),
-		"ip6gateway":   optionWasRemoved(!state.IP6Gateway.IsNull(), !plan.IP6Gateway.IsNull()),
+		"ip6gw":        optionWasRemoved(!state.IP6Gateway.IsNull(), !plan.IP6Gateway.IsNull()),
 		"auto":         optionWasRemoved(!state.Auto.IsNull(), !plan.Auto.IsNull()),
 		"type":         optionWasRemoved(!state.IfType.IsNull(), !plan.IfType.IsNull()),
 		"bridge_empty": optionWasRemoved(!state.BridgeEmpty.IsNull(), !plan.BridgeEmpty.IsNull()),
@@ -360,7 +360,9 @@ func (r *networkInterfaceResource) modelToOptions(ctx context.Context, plan netw
 		options["ip6assign"] = plan.IP6Assign.ValueString()
 	}
 	if !plan.IP6Gateway.IsNull() {
-		options["ip6gateway"] = plan.IP6Gateway.ValueString()
+		// "ip6gateway" is the Terraform-facing attribute name; the actual UCI/netifd
+		// option is "ip6gw" (see proto_ip_attributes in netifd's proto.c).
+		options["ip6gw"] = plan.IP6Gateway.ValueString()
 	}
 	if !plan.Auto.IsNull() {
 		options["auto"] = plan.Auto.ValueString()
@@ -435,7 +437,7 @@ func (r *networkInterfaceResource) optionsToModel(ctx context.Context, data map[
 	if v, ok := data["ip6assign"].(string); ok {
 		state.IP6Assign = types.StringValue(v)
 	}
-	if v, ok := data["ip6gateway"].(string); ok {
+	if v, ok := data["ip6gw"].(string); ok {
 		state.IP6Gateway = types.StringValue(v)
 	}
 	if v, ok := data["auto"].(string); ok {
