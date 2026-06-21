@@ -170,6 +170,118 @@ resource "openwrt_network_interface" "test" {
 `
 }
 
+func TestAccNetworkInterface_DualStack(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { PreCheck(t) },
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckNetworkInterfaceDestroyed,
+		Steps: []resource.TestStep{
+			{
+				// Create with both IPv4 and IPv6
+				Config: testAccNetworkInterfaceConfigDualStack("tf_acc_dual"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "name", "tf_acc_dual"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ipaddr.0", "192.168.101.1/24"),
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ip6addr.0", "fd00:acc::1/64"),
+				),
+			},
+			{
+				// Update: remove ip6addr — verify it is cleared from UCI (not left stale)
+				Config: testAccNetworkInterfaceConfigIPv4Only("tf_acc_dual"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ipaddr.0", "192.168.101.1/24"),
+					resource.TestCheckNoResourceAttr("openwrt_network_interface.test", "ip6addr.#"),
+				),
+			},
+		},
+	})
+}
+
+func testAccNetworkInterfaceConfigDualStack(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_interface" "test" {
+  name    = "` + name + `"
+  proto   = "static"
+  ipaddr  = ["192.168.101.1/24"]
+  ip6addr = ["fd00:acc::1/64"]
+}
+`
+}
+
+func testAccNetworkInterfaceConfigIPv4Only(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_interface" "test" {
+  name   = "` + name + `"
+  proto  = "static"
+  ipaddr = ["192.168.101.1/24"]
+}
+`
+}
+
+func TestAccNetworkInterface_IP6Gateway(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { PreCheck(t) },
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             testAccCheckNetworkInterfaceDestroyed,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNetworkInterfaceConfigIP6Gateway("tf_acc_ip6gw"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_network_interface.test", "ip6gateway", "fd00:acc::1"),
+					// The Terraform attribute is "ip6gateway", but netifd's static proto
+					// handler only reads the UCI option "ip6gw" (proto_ip_attributes in
+					// netifd's proto.c). Assert the wire-level key directly so a
+					// regression back to the wrong key is caught even though Read()
+					// would otherwise round-trip a wrong key back to itself.
+					testAccCheckNetworkInterfaceUCIOption("openwrt_network_interface.test", "ip6gw", "fd00:acc::1"),
+				),
+			},
+		},
+	})
+}
+
+func testAccNetworkInterfaceConfigIP6Gateway(name string) string {
+	return ProviderConfig() + `
+resource "openwrt_network_interface" "test" {
+  name       = "` + name + `"
+  proto      = "static"
+  ip6addr    = ["fd00:acc::2/64"]
+  ip6gateway = "fd00:acc::1"
+}
+`
+}
+
+func testAccCheckNetworkInterfaceUCIOption(resourceName, option, want string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok {
+			return fmt.Errorf("resource not found: %s", resourceName)
+		}
+
+		parts := splitImportID(rs.Primary.ID)
+		if len(parts) != 2 {
+			return fmt.Errorf("unexpected resource ID format: %s", rs.Primary.ID)
+		}
+
+		client := GetTestProvider(&testing.T{})
+		if client == nil {
+			return nil
+		}
+
+		data, err := client.UCIGetAll(context.Background(), parts[0], parts[1])
+		if err != nil {
+			return err
+		}
+
+		got, _ := data[option].(string)
+		if got != want {
+			return fmt.Errorf("expected UCI option %q to be %q, got %q (raw: %#v)", option, want, got, data[option])
+		}
+
+		return nil
+	}
+}
+
 func TestAccNetworkBridgeVlan_basic(t *testing.T) {
 	RequireTestConfig(t)
 	bridgeDevice := GetVLANBridgeDevice()
