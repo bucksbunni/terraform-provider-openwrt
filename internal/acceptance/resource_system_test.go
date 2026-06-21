@@ -279,3 +279,52 @@ resource "openwrt_system_ntp" "test" {
 }
 `
 }
+
+func TestAccSystem_basic(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { PreCheck(t) },
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             nil, // system section is not deleted on destroy (see issue #52)
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSystemConfigBasic("tf-acc-hostname"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_system.test", "hostname", "tf-acc-hostname"),
+					resource.TestCheckResourceAttrSet("openwrt_system.test", "id"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccSystem_Update(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { PreCheck(t) },
+		ProtoV6ProviderFactories: TestAccProtoV6ProviderFactories(),
+		CheckDestroy:             nil, // system section is not deleted on destroy (see issue #52)
+		Steps: []resource.TestStep{
+			{
+				Config: testAccSystemConfigBasic("tf-acc-hostname"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_system.test", "hostname", "tf-acc-hostname"),
+					resource.TestCheckResourceAttrSet("openwrt_system.test", "id"),
+				),
+			},
+			{
+				Config: testAccSystemConfigBasic("tf-acc-hostname-2"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("openwrt_system.test", "hostname", "tf-acc-hostname-2"),
+					resource.TestCheckResourceAttrSet("openwrt_system.test", "id"),
+				),
+			},
+		},
+	})
+}
+
+func testAccSystemConfigBasic(hostname string) string {
+	return ProviderConfig() + `
+resource "openwrt_system" "test" {
+  hostname = "` + hostname + `"
+}
+`
+}
