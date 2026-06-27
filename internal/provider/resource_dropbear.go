@@ -24,6 +24,7 @@ type dropbearResource struct {
 
 type dropbearModel struct {
 	ID               types.String `tfsdk:"id"`
+	Section          types.String `tfsdk:"section"`
 	Name             types.String `tfsdk:"name"`
 	PasswordAuth     types.Bool   `tfsdk:"password_auth"`
 	Port             types.Int64  `tfsdk:"port"`
@@ -42,6 +43,13 @@ func (r *dropbearResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal ID: dropbear/<instance_name>.",
+			},
+			"section": schema.StringAttribute{
+				Computed:    true,
+				Description: "Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
@@ -97,6 +105,7 @@ func (r *dropbearResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error creating dropbear config", err.Error())
 		return
 	}
+	plan.Section = types.StringValue(secName)
 
 	for key, value := range options {
 		if err := r.client.UCISet(ctx, "dropbear", secName, key, value); err != nil {
@@ -132,26 +141,18 @@ func (r *dropbearResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	name := state.Name.ValueString()
 
-	instances, err := r.client.UCIForeach(ctx, "dropbear", "dropbear")
+	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
 		return
 	}
-
-	var data map[string]interface{}
-	for _, inst := range instances {
-		if inst["name"] == name {
-			data = inst
-			break
-		}
-	}
-
-	if data == nil {
+	if !found {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	r.optionsToModel(data, &state)
+	state.Section = types.StringValue(sectionName)
 	state.ID = types.StringValue(fmt.Sprintf("dropbear/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -170,21 +171,12 @@ func (r *dropbearResource) Update(ctx context.Context, req resource.UpdateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	instances, err := r.client.UCIForeach(ctx, "dropbear", "dropbear")
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
 		return
 	}
-
-	var secName string
-	for _, inst := range instances {
-		if inst["name"] == name {
-			secName = inst[".name"].(string)
-			break
-		}
-	}
-
-	if secName == "" {
+	if !found {
 		resp.Diagnostics.AddError("Error finding dropbear config", "instance not found")
 		return
 	}
@@ -204,6 +196,7 @@ func (r *dropbearResource) Update(ctx context.Context, req resource.UpdateReques
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	plan.Section = types.StringValue(secName)
 	plan.ID = types.StringValue(fmt.Sprintf("dropbear/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -218,22 +211,18 @@ func (r *dropbearResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	name := state.Name.ValueString()
 
-	instances, err := r.client.UCIForeach(ctx, "dropbear", "dropbear")
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
 		return
 	}
-
-	var secName string
-	for _, inst := range instances {
-		if inst["name"] == name {
-			secName = inst[".name"].(string)
-			break
-		}
+	if !found {
+		// Section already absent - treat as already deleted.
+		resp.State.RemoveResource(ctx)
+		return
 	}
 
-	if secName != "" {
-		if err := r.client.UCIDelete(ctx, "dropbear", secName); err != nil {
+	if err := r.client.UCIDelete(ctx, "dropbear", secName); err != nil {
 		resp.Diagnostics.AddError("Error deleting dropbear config", err.Error())
 		return
 	}
@@ -243,7 +232,6 @@ func (r *dropbearResource) Delete(ctx context.Context, req resource.DeleteReques
 	}
 	if err := r.client.UCIApply(ctx, false); err != nil {
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
-		}
 	}
 
 	resp.State.RemoveResource(ctx)

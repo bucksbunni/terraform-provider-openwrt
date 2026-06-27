@@ -29,3 +29,4 @@ Manages OpenWrt Dropbear SSH server settings.
 ### Read-Only
 
 - `id` (String) Internal ID: dropbear/<instance_name>.
+- `section` (String) Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.

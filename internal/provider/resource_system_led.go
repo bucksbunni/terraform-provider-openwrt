@@ -24,6 +24,7 @@ type systemLEDResource struct {
 
 type systemLEDModel struct {
 	ID      types.String `tfsdk:"id"`
+	Section types.String `tfsdk:"section"`
 	Name    types.String `tfsdk:"name"`
 	SysFS   types.String `tfsdk:"sysfs"`
 	Trigger types.String `tfsdk:"trigger"`
@@ -43,6 +44,13 @@ func (r *systemLEDResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal ID: system/<led_name>.",
+			},
+			"section": schema.StringAttribute{
+				Computed:    true,
+				Description: "Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
@@ -102,6 +110,7 @@ func (r *systemLEDResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Error creating LED config", err.Error())
 		return
 	}
+	plan.Section = types.StringValue(secName)
 
 	for key, value := range options {
 		if err := r.client.UCISet(ctx, "system", secName, key, value); err != nil {
@@ -137,26 +146,18 @@ func (r *systemLEDResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	name := state.Name.ValueString()
 
-	leds, err := r.client.UCIForeach(ctx, "system", "led")
+	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "system", "led", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading LED configs", err.Error())
 		return
 	}
-
-	var data map[string]interface{}
-	for _, led := range leds {
-		if led["name"] == name {
-			data = led
-			break
-		}
-	}
-
-	if data == nil {
+	if !found {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	r.optionsToModel(data, &state)
+	state.Section = types.StringValue(sectionName)
 	state.ID = types.StringValue(fmt.Sprintf("system/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -175,21 +176,12 @@ func (r *systemLEDResource) Update(ctx context.Context, req resource.UpdateReque
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	leds, err := r.client.UCIForeach(ctx, "system", "led")
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "system", "led", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading LED configs", err.Error())
 		return
 	}
-
-	var secName string
-	for _, led := range leds {
-		if led["name"] == name {
-			secName = led[".name"].(string)
-			break
-		}
-	}
-
-	if secName == "" {
+	if !found {
 		resp.Diagnostics.AddError("Error finding LED config", "LED not found")
 		return
 	}
@@ -209,6 +201,7 @@ func (r *systemLEDResource) Update(ctx context.Context, req resource.UpdateReque
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	plan.Section = types.StringValue(secName)
 	plan.ID = types.StringValue(fmt.Sprintf("system/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -223,32 +216,27 @@ func (r *systemLEDResource) Delete(ctx context.Context, req resource.DeleteReque
 
 	name := state.Name.ValueString()
 
-	leds, err := r.client.UCIForeach(ctx, "system", "led")
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "system", "led", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading LED configs", err.Error())
 		return
 	}
-
-	var secName string
-	for _, led := range leds {
-		if led["name"] == name {
-			secName = led[".name"].(string)
-			break
-		}
+	if !found {
+		// Section already absent - treat as already deleted.
+		resp.State.RemoveResource(ctx)
+		return
 	}
 
-	if secName != "" {
-		if err := r.client.UCIDelete(ctx, "system", secName); err != nil {
-			resp.Diagnostics.AddError("Error deleting LED config", err.Error())
-			return
-		}
-		if err := r.client.UCICommit(ctx, "system"); err != nil {
-			resp.Diagnostics.AddError("Error committing system config", err.Error())
-			return
-		}
-		if err := r.client.UCIApply(ctx, false); err != nil {
-			tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
-		}
+	if err := r.client.UCIDelete(ctx, "system", secName); err != nil {
+		resp.Diagnostics.AddError("Error deleting LED config", err.Error())
+		return
+	}
+	if err := r.client.UCICommit(ctx, "system"); err != nil {
+		resp.Diagnostics.AddError("Error committing system config", err.Error())
+		return
+	}
+	if err := r.client.UCIApply(ctx, false); err != nil {
+		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
 	resp.State.RemoveResource(ctx)

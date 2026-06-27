@@ -30,3 +30,4 @@ Manages OpenWrt system LED configuration.
 ### Read-Only
 
 - `id` (String) Internal ID: system/<led_name>.
+- `section` (String) Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.

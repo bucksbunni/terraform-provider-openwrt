@@ -25,7 +25,7 @@ vlan_config:
     - eth3
 
 # Wireless tests manage this radio (create/update/destroy). On real hardware this
-# WILL disrupt the radio while the test runs — point it at a spare/unused radio, or
+# WILL disrupt the radio while the test runs - point it at a spare/unused radio, or
 # leave testconfig.yaml absent to skip wireless tests entirely.
 wireless:
   radio: radio0

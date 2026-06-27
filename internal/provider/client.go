@@ -173,6 +173,8 @@ func (c *JsonRpcClient) call(ctx context.Context, library, method string, params
 	return c.callWithToken(ctx, library, method, params...)
 }
 
+// nextID returns the next monotonically increasing JSON-RPC request id.
+// It is safe for concurrent use.
 func (c *JsonRpcClient) nextID() int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -180,6 +182,11 @@ func (c *JsonRpcClient) nextID() int64 {
 	return c.id
 }
 
+// callWithToken POSTs a single JSON-RPC request to /cgi-bin/luci/rpc/<library>
+// using the current auth token and returns the raw result. Unlike call it does
+// not perform an initial login, so a token must already exist (call ensures this
+// via ensureAuth). If the request is rejected with HTTP 403 the token is assumed
+// stale: it is cleared, a fresh login is performed, and the call is retried once.
 func (c *JsonRpcClient) callWithToken(ctx context.Context, library, method string, params ...interface{}) (json.RawMessage, error) {
 	endpoint := *c.baseURL
 	endpoint.Path = "/cgi-bin/luci/rpc/" + library
@@ -243,6 +250,8 @@ func (c *JsonRpcClient) callWithToken(ctx context.Context, library, method strin
 
 // UCI
 
+// UCIGetAll returns all options of a section as a map. If section is empty, every
+// section in the config is returned keyed by its section name.
 func (c *JsonRpcClient) UCIGetAll(ctx context.Context, config, section string) (map[string]interface{}, error) {
 	params := []interface{}{config}
 	if section != "" {
@@ -260,6 +269,10 @@ func (c *JsonRpcClient) UCIGetAll(ctx context.Context, config, section string) (
 	return result, nil
 }
 
+// UCISection creates or updates a named section of the given type, applying the
+// provided option values, and returns the resulting section name. A null or false
+// RPC result - for example an invalid section identifier, since UCI names may only
+// contain [a-zA-Z0-9_] - is surfaced as an error rather than an empty name.
 func (c *JsonRpcClient) UCISection(ctx context.Context, config, typ, name string, values map[string]interface{}) (string, error) {
 	// section(config, type, name, values) -> section name or true/false
 	raw, err := c.call(ctx, "uci", "section", config, typ, name, values)
@@ -291,26 +304,39 @@ func (c *JsonRpcClient) UCISection(ctx context.Context, config, typ, name string
 	return secName, nil
 }
 
+// UCIDelete deletes the named section from the given config. The deletion is
+// staged; it takes effect only after UCICommit (and UCIApply).
 func (c *JsonRpcClient) UCIDelete(ctx context.Context, config, section string) error {
 	_, err := c.call(ctx, "uci", "delete", config, section)
 	return err
 }
 
+// UCIDeleteOption removes a single option from a section, leaving the section
+// itself intact. Like UCIDelete the change is staged; it takes effect only
+// after UCICommit (and UCIApply).
 func (c *JsonRpcClient) UCIDeleteOption(ctx context.Context, config, section, option string) error {
 	_, err := c.call(ctx, "uci", "delete", config, section, option)
 	return err
 }
 
+// UCICommit writes the staged changes for the given config from the delta
+// directory to the on-disk config file. Call UCIApply afterwards to reload the
+// affected services.
 func (c *JsonRpcClient) UCICommit(ctx context.Context, config string) error {
 	_, err := c.call(ctx, "uci", "commit", config)
 	return err
 }
 
+// UCIApply applies committed changes by reloading the affected services. When
+// rollback is true the apply is revertible and must be confirmed separately to
+// become permanent; the provider passes false for an immediate, permanent apply.
 func (c *JsonRpcClient) UCIApply(ctx context.Context, rollback bool) error {
 	_, err := c.call(ctx, "uci", "apply", rollback)
 	return err
 }
 
+// WifiReload reloads the wireless stack by running "wifi reload" on the device.
+// It is needed after wireless UCI changes, which a plain UCIApply does not pick up.
 func (c *JsonRpcClient) WifiReload(ctx context.Context) error {
 	_, err := c.SysCall(ctx, "exec", "wifi reload 2>&1")
 	if err != nil {
@@ -319,6 +345,8 @@ func (c *JsonRpcClient) WifiReload(ctx context.Context) error {
 	return nil
 }
 
+// UCITSet sets multiple options on a section in a single RPC call (the UCI
+// "tset" method), where values maps option names to their new values.
 func (c *JsonRpcClient) UCITSet(ctx context.Context, config, section string, values map[string]interface{}) error {
 	_, err := c.call(ctx, "uci", "tset", config, section, values)
 	return err
@@ -326,6 +354,8 @@ func (c *JsonRpcClient) UCITSet(ctx context.Context, config, section string, val
 
 // FS
 
+// FSReadFile reads the file at path and returns its contents base64-encoded, as
+// the fs.readfile RPC delivers them. Callers decode the result themselves.
 func (c *JsonRpcClient) FSReadFile(ctx context.Context, path string) (string, error) {
 	raw, err := c.call(ctx, "fs", "readfile", path)
 	if err != nil {
@@ -338,16 +368,20 @@ func (c *JsonRpcClient) FSReadFile(ctx context.Context, path string) (string, er
 	return b64, nil
 }
 
+// FSWriteFile writes base64Content to the file at path, creating or truncating
+// it. The content must already be base64-encoded, mirroring FSReadFile.
 func (c *JsonRpcClient) FSWriteFile(ctx context.Context, path, base64Content string) error {
 	_, err := c.call(ctx, "fs", "writefile", path, base64Content)
 	return err
 }
 
+// FSUnlink removes the file at path.
 func (c *JsonRpcClient) FSUnlink(ctx context.Context, path string) error {
 	_, err := c.call(ctx, "fs", "unlink", path)
 	return err
 }
 
+// FSStat returns metadata (type, size, mode, mtime, ...) for the file at path.
 func (c *JsonRpcClient) FSStat(ctx context.Context, path string) (map[string]interface{}, error) {
 	raw, err := c.call(ctx, "fs", "stat", path)
 	if err != nil {
@@ -392,6 +426,8 @@ func (c *JsonRpcClient) IPKGInstalled(ctx context.Context, pkg string) (bool, er
 	return false, nil
 }
 
+// IPKGInstall installs the named package. When update is true the package lists
+// are refreshed first ("opkg update") so the latest version is available.
 func (c *JsonRpcClient) IPKGInstall(ctx context.Context, pkg string, update bool) error {
 	if update {
 		if err := c.IPKGUpdate(ctx); err != nil {
@@ -402,6 +438,8 @@ func (c *JsonRpcClient) IPKGInstall(ctx context.Context, pkg string, update bool
 	return err
 }
 
+// IPKGRemove removes the named package. autoremove also removes now-unused
+// dependencies; forceRemove additionally removes packages that depend on it.
 func (c *JsonRpcClient) IPKGRemove(ctx context.Context, pkg string, autoremove, forceRemove bool) error {
 	args := []interface{}{pkg}
 	if autoremove {
@@ -674,8 +712,10 @@ func (c *JsonRpcClient) UCIDeleteAll(ctx context.Context, config, typ string) er
 	return err
 }
 
-// UCIForeach calls the callback for each section of a given type and returns
-// the resulting list of section tables.
+// UCIForeach returns every section of the given type in the config as a list of
+// option tables (each including the ".name", ".type" and ".index" metadata keys).
+// If typ is empty, all sections in the config are returned. The LuCI uci.foreach
+// RPC performs the iteration server-side, so there is no client-side callback.
 func (c *JsonRpcClient) UCIForeach(ctx context.Context, config, typ string) ([]map[string]interface{}, error) {
 	params := []interface{}{config}
 	if typ != "" {

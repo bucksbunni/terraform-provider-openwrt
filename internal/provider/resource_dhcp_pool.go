@@ -27,6 +27,7 @@ type dhcpPoolResource struct {
 
 type dhcpPoolModel struct {
 	ID        types.String `tfsdk:"id"`
+	Section   types.String `tfsdk:"section"`
 	Name      types.String `tfsdk:"name"`
 	Interface types.String `tfsdk:"interface"`
 	Start     types.Int64  `tfsdk:"start"`
@@ -50,6 +51,13 @@ func (r *dhcpPoolResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal ID: dhcp/<interface_name>.",
+			},
+			"section": schema.StringAttribute{
+				Computed:    true,
+				Description: "Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
@@ -134,6 +142,7 @@ func (r *dhcpPoolResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error creating DHCP pool", err.Error())
 		return
 	}
+	plan.Section = types.StringValue(secName)
 
 	for key, value := range options {
 		if err := r.client.UCISet(ctx, "dhcp", secName, key, value); err != nil {
@@ -169,27 +178,18 @@ func (r *dhcpPoolResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	name := state.Name.ValueString()
 
-	pools, err := r.client.UCIForeach(ctx, "dhcp", "dhcp")
+	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
 		return
 	}
-
-	var data map[string]interface{}
-	for _, pool := range pools {
-		nameVal, ok := pool["name"].(string)
-		if ok && nameVal == name {
-			data = pool
-			break
-		}
-	}
-
-	if data == nil {
+	if !found {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	r.optionsToModel(data, &state)
+	state.Section = types.StringValue(sectionName)
 	state.ID = types.StringValue(fmt.Sprintf("dhcp/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -208,21 +208,12 @@ func (r *dhcpPoolResource) Update(ctx context.Context, req resource.UpdateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
 
-	pools, err := r.client.UCIForeach(ctx, "dhcp", "dhcp")
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
 		return
 	}
-
-	var secName string
-	for _, p := range pools {
-		if p["name"] == name {
-			secName = p[".name"].(string)
-			break
-		}
-	}
-
-	if secName == "" {
+	if !found {
 		resp.Diagnostics.AddError("Error finding DHCP pool", "pool not found")
 		return
 	}
@@ -242,6 +233,7 @@ func (r *dhcpPoolResource) Update(ctx context.Context, req resource.UpdateReques
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
+	plan.Section = types.StringValue(secName)
 	plan.ID = types.StringValue(fmt.Sprintf("dhcp/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -256,32 +248,27 @@ func (r *dhcpPoolResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	name := state.Name.ValueString()
 
-	pools, err := r.client.UCIForeach(ctx, "dhcp", "dhcp")
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
 		return
 	}
-
-	var secName string
-	for _, p := range pools {
-		if p["name"] == name {
-			secName = p[".name"].(string)
-			break
-		}
+	if !found {
+		// Section already absent - treat as already deleted.
+		resp.State.RemoveResource(ctx)
+		return
 	}
 
-	if secName != "" {
-		if err := r.client.UCIDelete(ctx, "dhcp", secName); err != nil {
-			resp.Diagnostics.AddError("Error deleting DHCP pool", err.Error())
-			return
-		}
-		if err := r.client.UCICommit(ctx, "dhcp"); err != nil {
-			resp.Diagnostics.AddError("Error committing DHCP config", err.Error())
-			return
-		}
-		if err := r.client.UCIApply(ctx, false); err != nil {
-			tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
-		}
+	if err := r.client.UCIDelete(ctx, "dhcp", secName); err != nil {
+		resp.Diagnostics.AddError("Error deleting DHCP pool", err.Error())
+		return
+	}
+	if err := r.client.UCICommit(ctx, "dhcp"); err != nil {
+		resp.Diagnostics.AddError("Error committing DHCP config", err.Error())
+		return
+	}
+	if err := r.client.UCIApply(ctx, false); err != nil {
+		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
 	resp.State.RemoveResource(ctx)

@@ -13,7 +13,7 @@ import (
 //
 // The defaults target the throwaway OpenWrt VM in testinfra/. When running against a
 // real router, supply testconfig.yaml so tests never touch interfaces the router
-// needs for its own connectivity — see RequireTestConfig.
+// needs for its own connectivity - see RequireTestConfig.
 type TestConfig struct {
 	BridgeDevices []string       `yaml:"bridge_devices"`
 	VLANConfig    VLANConfig     `yaml:"vlan_config"`
