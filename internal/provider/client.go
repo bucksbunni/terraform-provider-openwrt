@@ -311,6 +311,14 @@ func (c *JsonRpcClient) UCIDelete(ctx context.Context, config, section string) e
 	return err
 }
 
+// UCIDeleteOption removes a single option from a section, leaving the section
+// itself intact. Like UCIDelete the change is staged; it takes effect only
+// after UCICommit (and UCIApply).
+func (c *JsonRpcClient) UCIDeleteOption(ctx context.Context, config, section, option string) error {
+	_, err := c.call(ctx, "uci", "delete", config, section, option)
+	return err
+}
+
 // UCICommit writes the staged changes for the given config from the delta
 // directory to the on-disk config file. Call UCIApply afterwards to reload the
 // affected services.
