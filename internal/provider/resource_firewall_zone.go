@@ -23,17 +23,17 @@ type firewallZoneResource struct {
 }
 
 type firewallZoneModel struct {
-	ID          types.String `tfsdk:"id"`
-	SectionName types.String `tfsdk:"section_name"`
-	Name        types.String `tfsdk:"name"`
-	Input       types.String `tfsdk:"input"`
-	Output      types.String `tfsdk:"output"`
-	Forward     types.String `tfsdk:"forward"`
-	Masq        types.Bool   `tfsdk:"masq"`
-	MasqSrc     types.String `tfsdk:"masq_src"`
-	MasqDest    types.String `tfsdk:"masq_dest"`
-	MtuFix      types.Bool   `tfsdk:"mtu_fix"`
-	Network     types.List   `tfsdk:"network"`
+	ID       types.String `tfsdk:"id"`
+	Section  types.String `tfsdk:"section"`
+	Name     types.String `tfsdk:"name"`
+	Input    types.String `tfsdk:"input"`
+	Output   types.String `tfsdk:"output"`
+	Forward  types.String `tfsdk:"forward"`
+	Masq     types.Bool   `tfsdk:"masq"`
+	MasqSrc  types.String `tfsdk:"masq_src"`
+	MasqDest types.String `tfsdk:"masq_dest"`
+	MtuFix   types.Bool   `tfsdk:"mtu_fix"`
+	Network  types.List   `tfsdk:"network"`
 }
 
 func (r *firewallZoneResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -48,7 +48,7 @@ func (r *firewallZoneResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 				Description: "Internal ID: firewall/<zone_name>.",
 			},
-			"section_name": schema.StringAttribute{
+			"section": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.",
 				PlanModifiers: []planmodifier.String{
@@ -133,7 +133,7 @@ func (r *firewallZoneResource) Create(ctx context.Context, req resource.CreateRe
 		resp.Diagnostics.AddError("Error creating firewall zone", err.Error())
 		return
 	}
-	plan.SectionName = types.StringValue(secName)
+	plan.Section = types.StringValue(secName)
 
 	tflog.Debug(ctx, "UCIAdd returned", map[string]interface{}{"secName": secName})
 
@@ -175,7 +175,7 @@ func (r *firewallZoneResource) Read(ctx context.Context, req resource.ReadReques
 	name := state.Name.ValueString()
 	tflog.Debug(ctx, "Read firewall zone", map[string]interface{}{"name": name, "id": state.ID.ValueString()})
 
-	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "firewall", "zone", state.SectionName.ValueString(), map[string]string{"name": name})
+	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "firewall", "zone", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading firewall zones", err.Error())
 		return
@@ -189,7 +189,7 @@ func (r *firewallZoneResource) Read(ctx context.Context, req resource.ReadReques
 	tflog.Debug(ctx, "Firewall zone data", map[string]interface{}{"data": data})
 
 	r.optionsToModel(ctx, data, &state)
-	state.SectionName = types.StringValue(sectionName)
+	state.Section = types.StringValue(sectionName)
 	state.ID = types.StringValue(fmt.Sprintf("firewall/%s", name))
 
 	tflog.Debug(ctx, "Firewall zone state after read", map[string]interface{}{"name": state.Name.ValueString(), "input": state.Input.ValueString(), "output": state.Output.ValueString(), "forward": state.Forward.ValueString()})
@@ -210,7 +210,7 @@ func (r *firewallZoneResource) Update(ctx context.Context, req resource.UpdateRe
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
 
-	_, secName, found, err := r.client.UCIResolveSection(ctx, "firewall", "zone", state.SectionName.ValueString(), map[string]string{"name": name})
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "firewall", "zone", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading firewall zones", err.Error())
 		return
@@ -235,7 +235,7 @@ func (r *firewallZoneResource) Update(ctx context.Context, req resource.UpdateRe
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
-	plan.SectionName = types.StringValue(secName)
+	plan.Section = types.StringValue(secName)
 	plan.ID = types.StringValue(fmt.Sprintf("firewall/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -250,7 +250,7 @@ func (r *firewallZoneResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	name := state.Name.ValueString()
 
-	_, secName, found, err := r.client.UCIResolveSection(ctx, "firewall", "zone", state.SectionName.ValueString(), map[string]string{"name": name})
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "firewall", "zone", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading firewall zones", err.Error())
 		return

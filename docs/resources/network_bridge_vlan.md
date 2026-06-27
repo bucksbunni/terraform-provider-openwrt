@@ -26,4 +26,4 @@ Manages a bridge VLAN assignment in OpenWrt.
 ### Read-Only
 
 - `id` (String) Internal ID: network/<device>_<vlan>.
-- `section_name` (String) Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.
+- `section` (String) Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.

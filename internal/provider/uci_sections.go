@@ -24,7 +24,7 @@ import (
 // Strategy
 //
 // Each resource backed by an anonymous section persists that `.name` in a
-// Computed `section_name` attribute at Create time (taken from UCIAdd) and
+// Computed `section` attribute at Create time (taken from UCIAdd) and
 // addresses the section directly afterwards. UCIResolveSection encapsulates the
 // lookup: it trusts the persisted identifier when present and falls back to
 // matching on stable option values (such as a name, or a device+vlan pair) only

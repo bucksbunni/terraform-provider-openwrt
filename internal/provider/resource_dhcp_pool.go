@@ -26,18 +26,18 @@ type dhcpPoolResource struct {
 }
 
 type dhcpPoolModel struct {
-	ID          types.String `tfsdk:"id"`
-	SectionName types.String `tfsdk:"section_name"`
-	Name        types.String `tfsdk:"name"`
-	Interface   types.String `tfsdk:"interface"`
-	Start       types.Int64  `tfsdk:"start"`
-	Limit       types.Int64  `tfsdk:"limit"`
-	Leasetime   types.String `tfsdk:"leasetime"`
-	DHCPv4      types.String `tfsdk:"dhcpv4"`
-	DHCPv6      types.String `tfsdk:"dhcpv6"`
-	RA          types.String `tfsdk:"ra"`
-	RAFlags     types.List   `tfsdk:"ra_flags"`
-	Ignore      types.Bool   `tfsdk:"ignore"`
+	ID        types.String `tfsdk:"id"`
+	Section   types.String `tfsdk:"section"`
+	Name      types.String `tfsdk:"name"`
+	Interface types.String `tfsdk:"interface"`
+	Start     types.Int64  `tfsdk:"start"`
+	Limit     types.Int64  `tfsdk:"limit"`
+	Leasetime types.String `tfsdk:"leasetime"`
+	DHCPv4    types.String `tfsdk:"dhcpv4"`
+	DHCPv6    types.String `tfsdk:"dhcpv6"`
+	RA        types.String `tfsdk:"ra"`
+	RAFlags   types.List   `tfsdk:"ra_flags"`
+	Ignore    types.Bool   `tfsdk:"ignore"`
 }
 
 func (r *dhcpPoolResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -52,7 +52,7 @@ func (r *dhcpPoolResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:    true,
 				Description: "Internal ID: dhcp/<interface_name>.",
 			},
-			"section_name": schema.StringAttribute{
+			"section": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.",
 				PlanModifiers: []planmodifier.String{
@@ -142,7 +142,7 @@ func (r *dhcpPoolResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error creating DHCP pool", err.Error())
 		return
 	}
-	plan.SectionName = types.StringValue(secName)
+	plan.Section = types.StringValue(secName)
 
 	for key, value := range options {
 		if err := r.client.UCISet(ctx, "dhcp", secName, key, value); err != nil {
@@ -178,7 +178,7 @@ func (r *dhcpPoolResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	name := state.Name.ValueString()
 
-	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.SectionName.ValueString(), map[string]string{"name": name})
+	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
 		return
@@ -189,7 +189,7 @@ func (r *dhcpPoolResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	r.optionsToModel(data, &state)
-	state.SectionName = types.StringValue(sectionName)
+	state.Section = types.StringValue(sectionName)
 	state.ID = types.StringValue(fmt.Sprintf("dhcp/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -208,7 +208,7 @@ func (r *dhcpPoolResource) Update(ctx context.Context, req resource.UpdateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(ctx, plan)
 
-	_, secName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.SectionName.ValueString(), map[string]string{"name": name})
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
 		return
@@ -233,7 +233,7 @@ func (r *dhcpPoolResource) Update(ctx context.Context, req resource.UpdateReques
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
-	plan.SectionName = types.StringValue(secName)
+	plan.Section = types.StringValue(secName)
 	plan.ID = types.StringValue(fmt.Sprintf("dhcp/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -248,7 +248,7 @@ func (r *dhcpPoolResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	name := state.Name.ValueString()
 
-	_, secName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.SectionName.ValueString(), map[string]string{"name": name})
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "dhcp", "dhcp", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading DHCP pools", err.Error())
 		return

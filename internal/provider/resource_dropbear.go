@@ -24,7 +24,7 @@ type dropbearResource struct {
 
 type dropbearModel struct {
 	ID               types.String `tfsdk:"id"`
-	SectionName      types.String `tfsdk:"section_name"`
+	Section          types.String `tfsdk:"section"`
 	Name             types.String `tfsdk:"name"`
 	PasswordAuth     types.Bool   `tfsdk:"password_auth"`
 	Port             types.Int64  `tfsdk:"port"`
@@ -44,7 +44,7 @@ func (r *dropbearResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:    true,
 				Description: "Internal ID: dropbear/<instance_name>.",
 			},
-			"section_name": schema.StringAttribute{
+			"section": schema.StringAttribute{
 				Computed:    true,
 				Description: "Internal UCI section identifier (e.g. 'cfg0abc12') of the anonymous section backing this resource. Managed automatically; resolved on import.",
 				PlanModifiers: []planmodifier.String{
@@ -105,7 +105,7 @@ func (r *dropbearResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error creating dropbear config", err.Error())
 		return
 	}
-	plan.SectionName = types.StringValue(secName)
+	plan.Section = types.StringValue(secName)
 
 	for key, value := range options {
 		if err := r.client.UCISet(ctx, "dropbear", secName, key, value); err != nil {
@@ -141,7 +141,7 @@ func (r *dropbearResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	name := state.Name.ValueString()
 
-	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.SectionName.ValueString(), map[string]string{"name": name})
+	data, sectionName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
 		return
@@ -152,7 +152,7 @@ func (r *dropbearResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	r.optionsToModel(data, &state)
-	state.SectionName = types.StringValue(sectionName)
+	state.Section = types.StringValue(sectionName)
 	state.ID = types.StringValue(fmt.Sprintf("dropbear/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -171,7 +171,7 @@ func (r *dropbearResource) Update(ctx context.Context, req resource.UpdateReques
 	name := plan.Name.ValueString()
 	options := r.modelToOptions(plan)
 
-	_, secName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.SectionName.ValueString(), map[string]string{"name": name})
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
 		return
@@ -196,7 +196,7 @@ func (r *dropbearResource) Update(ctx context.Context, req resource.UpdateReques
 		tflog.Warn(ctx, "Applying UCI changes failed", map[string]interface{}{"error": err.Error()})
 	}
 
-	plan.SectionName = types.StringValue(secName)
+	plan.Section = types.StringValue(secName)
 	plan.ID = types.StringValue(fmt.Sprintf("dropbear/%s", name))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -211,7 +211,7 @@ func (r *dropbearResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	name := state.Name.ValueString()
 
-	_, secName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.SectionName.ValueString(), map[string]string{"name": name})
+	_, secName, found, err := r.client.UCIResolveSection(ctx, "dropbear", "dropbear", state.Section.ValueString(), map[string]string{"name": name})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading dropbear configs", err.Error())
 		return

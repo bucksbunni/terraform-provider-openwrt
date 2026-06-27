@@ -3,7 +3,7 @@ package acceptance
 // These tests cover the destroy/refresh behaviour of resources backed by
 // anonymous UCI sections (bridge VLANs, network devices, dropbear, LEDs), which
 // the provider addresses by the stable internal section identifier persisted in
-// the Computed section_name attribute. They specifically guard the regression
+// the Computed section attribute. They specifically guard the regression
 // from issue #55: destroying an openwrt_network_bridge_vlan must succeed even
 // when its underlying section has already been removed out of band - for example
 // when a managed parent openwrt_network_device is torn down first and netifd
@@ -113,7 +113,7 @@ func TestAccNetworkBridgeVlan_Disappears(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "device", bridgeDevice),
 					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "vlan", "100"),
-					resource.TestCheckResourceAttrSet("openwrt_network_bridge_vlan.test", "section_name"),
+					resource.TestCheckResourceAttrSet("openwrt_network_bridge_vlan.test", "section"),
 					deleteSectionByMatch("network", "bridge-vlan", map[string]string{
 						"device": bridgeDevice,
 						"vlan":   "100",
@@ -150,8 +150,8 @@ func TestAccNetworkBridgeVlan_DestroyWithManagedDevice(t *testing.T) {
 				Config: testAccNetworkBridgeVlanConfigNoDep(bridgeDevice, 100, ports[0]),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_network_bridge_vlan.test", "vlan", "100"),
-					resource.TestCheckResourceAttrSet("openwrt_network_bridge_vlan.test", "section_name"),
-					resource.TestCheckResourceAttrSet("openwrt_network_device.bridge", "section_name"),
+					resource.TestCheckResourceAttrSet("openwrt_network_bridge_vlan.test", "section"),
+					resource.TestCheckResourceAttrSet("openwrt_network_device.bridge", "section"),
 				),
 			},
 		},
@@ -175,7 +175,7 @@ func TestAccNetworkDevice_Disappears(t *testing.T) {
 				Config: testAccNetworkDeviceConfigBasic(bridgeName),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_network_device.test", "name", bridgeName),
-					resource.TestCheckResourceAttrSet("openwrt_network_device.test", "section_name"),
+					resource.TestCheckResourceAttrSet("openwrt_network_device.test", "section"),
 					deleteSectionByMatch("network", "device", map[string]string{"name": bridgeName}),
 				),
 				ExpectNonEmptyPlan: true,
@@ -198,7 +198,7 @@ func TestAccDropbear_Disappears(t *testing.T) {
 				Config: testAccDropbearConfigBasic("tf-acc-ssh"),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_dropbear.test", "name", "test-dropbear"),
-					resource.TestCheckResourceAttrSet("openwrt_dropbear.test", "section_name"),
+					resource.TestCheckResourceAttrSet("openwrt_dropbear.test", "section"),
 					deleteSectionByMatch("dropbear", "dropbear", map[string]string{"name": "test-dropbear"}),
 				),
 				ExpectNonEmptyPlan: true,
@@ -221,7 +221,7 @@ func TestAccSystemLED_Disappears(t *testing.T) {
 				Config: testAccSystemLEDConfigBasic("tf-acc-led", "tp-link:green:power"),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("openwrt_system_led.test", "name", "tf-acc-led"),
-					resource.TestCheckResourceAttrSet("openwrt_system_led.test", "section_name"),
+					resource.TestCheckResourceAttrSet("openwrt_system_led.test", "section"),
 					deleteSectionByMatch("system", "led", map[string]string{"name": "tf-acc-led"}),
 				),
 				ExpectNonEmptyPlan: true,
